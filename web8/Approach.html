@@ -1,0 +1,2697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Approach — Earth Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.15)} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+
+body { font-family: 'Space Grotesk', sans-serif; background: #0a0a0a; color: rgba(255,255,255,0.85); min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+
+/* ── NAV ── */
+#topnav {
+  position: fixed; top: 0; width: 100%; height: 60px;
+  background: rgba(10,10,10,0.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px; z-index: 1000;
+}
+.nav-logo-text {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: #ffffff;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.nav-links { display: flex; align-items: center; gap: 2px; }
+.nav-links .nav-btn {
+  background: none; border: none;
+  color: rgba(255,255,255,0.55);
+  padding: 8px 16px; font-size: 13px; font-weight: 400;
+  font-family: 'Space Grotesk', sans-serif; cursor: pointer;
+  border-radius: 6px; transition: color 0.15s, background 0.15s;
+  letter-spacing: 0; text-decoration: none; display: inline-block;
+}
+.nav-links .nav-btn:hover { color: #ffffff; background: rgba(255,255,255,0.07); }
+.nav-links .nav-btn--active { color: #ffffff; }
+
+/* ── HERO ── */
+#ap-hero { position: relative; height: 380px; overflow: hidden; display: flex; align-items: flex-end; padding-top: 60px; }
+#ap-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#ap-hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, #0a0a0a 0%, rgba(10,10,10,0.55) 45%, transparent 100%); }
+#ap-hero-text { position: relative; z-index: 2; padding: 0 4% 52px; max-width: 760px; animation: fadeUp 0.8s ease both; }
+.ap-eyebrow { font-family: 'Orbitron', monospace; font-size: 10px; letter-spacing: 4px; color: rgba(0,200,255,0.75); text-transform: uppercase; margin-bottom: 12px; display: block; }
+#ap-hero-title { font-family: 'Space Grotesk', sans-serif; font-size: clamp(32px, 4.5vw, 56px); font-weight: 600; color: #fff; margin-bottom: 14px; line-height: 1.1; }
+#ap-hero-sub { font-size: 15px; color: rgba(255,255,255,0.5); line-height: 1.75; max-width: 560px; }
+#ap-hero-sub strong { color: #4cff88; }
+
+/* ── MAIN ── */
+#ap-main { padding: 60px 4% 100px; max-width: 1400px; margin: 0 auto; }
+.ap-section-label { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 4px; color: rgba(0,200,255,0.45); text-transform: uppercase; display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+.ap-section-label::after { content: ''; flex: 1; height: 1px; background: rgba(0,200,255,0.12); }
+
+/* ── CARDS ── */
+#ap-cards-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 80px; }
+@media (max-width: 700px) { #ap-cards-grid { grid-template-columns: 1fr; } }
+
+.ap-card {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(0,180,255,0.14);
+    border-radius: 14px; padding: 28px 26px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s;
+    cursor: pointer; position: relative; overflow: hidden;
+}
+.ap-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background: linear-gradient(90deg, transparent, rgba(0,200,255,0.3), transparent); }
+.ap-card:hover { transform: translateY(-4px); border-color: rgba(0,200,255,0.3); box-shadow: 0 20px 48px rgba(0,0,0,0.4); }
+.ap-card.runnable { border-color: rgba(76,255,136,0.2); }
+.ap-card.runnable::before { background: linear-gradient(90deg, transparent, rgba(76,255,136,0.3), transparent); }
+.ap-card.runnable:hover { border-color: rgba(76,255,136,0.45); box-shadow: 0 20px 48px rgba(0,0,0,0.4), 0 0 30px rgba(76,255,136,0.07); }
+
+.run-badge { position: absolute; top: 14px; right: 14px; font-family: 'Share Tech Mono', monospace; font-size: 8px; letter-spacing: 2px; padding: 4px 10px; border-radius: 20px; background: rgba(76,255,136,0.1); color: #4cff88; border: 1px solid rgba(76,255,136,0.25); text-transform: uppercase; }
+.ap-card-num { width: 42px; height: 42px; border-radius: 50%; background: rgba(0,180,255,0.15); color: #9ecbff; font-family: 'Orbitron', monospace; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(0,200,255,0.25); }
+.ap-card.runnable .ap-card-num { background: rgba(76,255,136,0.1); color: #4cff88; border-color: rgba(76,255,136,0.25); }
+.ap-card-title { font-size: 17px; font-weight: 600; color: #e8f4ff; margin-bottom: 9px; }
+.ap-card-desc { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.65; margin-bottom: 16px; }
+.ap-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.ap-tag { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 1px; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; background: rgba(0,180,255,0.08); color: rgba(0,200,255,0.7); border: 1px solid rgba(0,200,255,0.2); }
+.ap-card.runnable .ap-tag { background: rgba(76,255,136,0.07); color: rgba(76,255,136,0.7); border-color: rgba(76,255,136,0.2); }
+.ap-card-wide { grid-column: span 2; }
+@media (max-width: 700px) { .ap-card-wide { grid-column: span 1; } }
+
+/* ── PIPELINE ── */
+#ap-pipeline-wrap { background: rgba(255,255,255,0.04); border: 1px solid rgba(0,180,255,0.14); border-radius: 16px; padding: 32px 36px; overflow-x: auto; margin-bottom: 60px; position: relative; }
+#ap-pipeline-wrap::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background: linear-gradient(90deg,transparent,rgba(0,200,255,0.3),transparent); }
+#ap-pipeline { display: flex; align-items: center; justify-content: space-between; min-width: 560px; }
+.ap-pipe-step { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1; text-align: center; }
+.ap-pipe-icon-wrap { width: 56px; height: 56px; border-radius: 50%; background: rgba(0,180,255,0.1); border: 1px solid rgba(0,200,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 24px; transition: transform 0.2s, box-shadow 0.2s; }
+.ap-pipe-step:hover .ap-pipe-icon-wrap { transform: scale(1.1); box-shadow: 0 0 20px rgba(0,200,255,0.2); }
+.ap-pipe-name { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.8); line-height: 1.4; }
+.ap-pipe-sub { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: rgba(0,200,255,0.45); letter-spacing: 1px; text-transform: uppercase; }
+.ap-pipe-arrow { flex-shrink: 0; padding: 0 10px; color: rgba(0,200,255,0.25); font-size: 20px; margin-top: -18px; }
+
+/* ── FOOTER ── */
+#ap-footer { background: rgba(0,0,0,0.95); border-top: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); padding: 36px 4%; text-align: center; font-size: 13px; line-height: 1.8; }
+#ap-footer a { color: rgba(0,200,255,0.7); text-decoration: none; }
+#ap-footer a:hover { color: #00e5ff; }
+#ap-footer-logo { font-family: 'Orbitron', monospace; font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #fff; margin-bottom: 10px; display: block; }
+
+/* ── RUNNER MODAL ── */
+#runner-overlay { display: none; position: fixed; inset: 0; z-index: 500; background: rgba(4,8,18,0.8); backdrop-filter: blur(10px); align-items: center; justify-content: center; padding: 20px; }
+#runner-overlay.open { display: flex; }
+#runner-modal { background: #0b1323; border: 1px solid rgba(0,200,255,0.15); border-radius: 20px; width: 100%; max-width: 900px; max-height: 90vh; overflow-y: auto; box-shadow: 0 40px 100px rgba(0,0,0,0.7); display: flex; flex-direction: column; }
+
+#runner-header { padding: 26px 30px 18px; border-bottom: 1px solid rgba(0,200,255,0.1); display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-shrink: 0; background: rgba(0,20,50,0.4); }
+#runner-algo-badge { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 3px; color: rgba(0,200,255,0.5); text-transform: uppercase; margin-bottom: 5px; }
+#runner-title { font-size: 22px; font-weight: 600; color: #e6f0ff; }
+#runner-close { background: none; border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.5); width: 36px; height: 36px; border-radius: 8px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+#runner-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+#runner-tabs { padding: 14px 30px; border-bottom: 1px solid rgba(0,200,255,0.08); display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; background: rgba(0,10,30,0.3); }
+.vtab { padding: 8px 18px; border-radius: 8px; border: 1px solid rgba(0,200,255,0.18); background: none; font-size: 12px; font-family: 'Share Tech Mono', monospace; letter-spacing: 1px; color: rgba(0,200,255,0.45); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; text-transform: uppercase; }
+.vtab:hover { border-color: rgba(76,255,136,0.4); color: rgba(76,255,136,0.8); }
+.vtab.active { background: rgba(76,255,136,0.12); color: #4cff88; border-color: rgba(76,255,136,0.45); }
+.vtag-pill { font-family: 'Share Tech Mono', monospace; font-size: 8px; letter-spacing: 1px; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.35); }
+.vtab.active .vtag-pill { background: rgba(76,255,136,0.2); color: rgba(76,255,136,0.7); }
+
+#runner-body { padding: 24px 30px; flex: 1; }
+#ver-desc { font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.75; margin-bottom: 20px; }
+
+.code-btn { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; background: none; border: 1px solid rgba(0,200,255,0.2); color: rgba(0,200,255,0.5); padding: 6px 14px; border-radius: 6px; cursor: pointer; margin-bottom: 12px; transition: all 0.2s; }
+.code-btn:hover { border-color: rgba(0,200,255,0.5); color: rgba(0,200,255,0.9); }
+.code-wrap { display: none; background: #060d18; border: 1px solid rgba(0,200,255,0.1); border-radius: 10px; overflow: hidden; margin-bottom: 22px; }
+.code-wrap.show { display: block; }
+.code-bar { padding: 10px 16px; background: rgba(0,200,255,0.04); display: flex; justify-content: space-between; font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 2px; color: rgba(0,200,255,0.35); text-transform: uppercase; border-bottom: 1px solid rgba(0,200,255,0.08); }
+.code-body { padding: 18px; overflow-x: auto; }
+.code-body pre { font-family: 'Share Tech Mono', monospace; font-size: 12px; line-height: 1.75; color: #e6edf3; white-space: pre; }
+.py-kw{color:#ff7b72} .py-fn{color:#d2a8ff} .py-str{color:#a5d6ff} .py-num{color:#79c0ff} .py-cmt{color:#6e7681;font-style:italic}
+
+#params-wrap { margin-bottom: 22px; }
+.param-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.param-label { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.8); min-width: 180px; }
+.param-input { padding: 9px 13px; border: 1px solid rgba(0,200,255,0.2); border-radius: 8px; font-size: 13px; font-family: 'Space Grotesk', sans-serif; color: #e6f0ff; background: rgba(0,200,255,0.05); width: 130px; transition: border-color 0.2s; outline: none; }
+.param-input:focus { border-color: rgba(0,200,255,0.55); background: rgba(0,200,255,0.08); box-shadow: 0 0 0 3px rgba(0,212,255,0.08); }
+.param-hint { font-size: 11px; color: rgba(255,255,255,0.3); }
+
+#run-btn { display: flex; align-items: center; gap: 10px; background: rgba(0,212,255,0.12); border: 1px solid rgba(0,212,255,0.35); color: #00d4ff; padding: 13px 28px; border-radius: 10px; font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 0.2s; }
+#run-btn:hover:not(:disabled) { background: rgba(0,212,255,0.22); border-color: rgba(0,212,255,0.65); box-shadow: 0 0 18px rgba(0,212,255,0.15); }
+#run-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.spinner { width: 16px; height: 16px; border: 2px solid rgba(0,212,255,0.25); border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
+.running .spinner { display: block; }
+.running .run-icon { display: none; }
+
+#output-wrap { margin-top: 26px; border-top: 1px solid rgba(0,200,255,0.08); padding-top: 24px; display: none; }
+#output-wrap.show { display: block; }
+.out-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.out-label { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 3px; color: rgba(0,200,255,0.4); text-transform: uppercase; }
+.out-status { font-family: 'Share Tech Mono', monospace; font-size: 10px; padding: 3px 10px; border-radius: 10px; }
+.s-ok  { background: rgba(76,255,136,0.08);  color: #4cff88;  border: 1px solid rgba(76,255,136,0.25); }
+.s-err { background: rgba(255,80,80,0.08);   color: #ff6060;  border: 1px solid rgba(255,80,80,0.25); }
+.s-run { background: rgba(0,200,255,0.08);   color: #00d4ff;  border: 1px solid rgba(0,200,255,0.25); }
+
+#terminal { background: #060d18; border: 1px solid rgba(0,200,255,0.1); border-radius: 10px; padding: 18px; font-family: 'Share Tech Mono', monospace; font-size: 12px; line-height: 1.9; color: #e6edf3; margin-bottom: 18px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+.tg { color: #4cff88; } .ty { color: #ffd44c; } .tb { color: #79c0ff; } .tr { color: #ff7b72; } .td { color: #6e7681; }
+
+#charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 600px) { #charts-grid { grid-template-columns: 1fr; } }
+.chart-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(0,180,255,0.12); border-radius: 12px; padding: 18px; }
+.chart-card-title { font-size: 11px; font-weight: 700; color: rgba(0,200,255,0.6); margin-bottom: 12px; font-family: 'Share Tech Mono', monospace; letter-spacing: 1px; text-transform: uppercase; }
+.map-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(0,180,255,0.12); border-radius: 12px; overflow: hidden; grid-column: span 2; }
+.map-card-title { font-size: 11px; font-weight: 700; color: rgba(0,200,255,0.6); padding: 14px 18px 10px; font-family: 'Share Tech Mono', monospace; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid rgba(0,200,255,0.08); }
+#v31-map { height: 220px; width: 100%; }
+@media (max-width: 600px) { .map-card { grid-column: span 1; } }
+
+/* ═══ LR MODAL — shares cnn-overlay base styles, overrides accent colour ═══ */
+#lr-overlay { display:none; position:fixed; inset:0; z-index:500; background:rgba(4,10,24,0.85); backdrop-filter:blur(8px); align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; }
+#lr-overlay.open { display:flex; }
+#lr-modal { background:#0b1323; border:1px solid rgba(160,100,255,0.18); border-radius:20px; width:100%; max-width:1100px; margin:auto; box-shadow:0 40px 100px rgba(0,0,0,0.7); display:flex; flex-direction:column; overflow:hidden; }
+
+#lr-header { padding:24px 28px 16px; border-bottom:1px solid rgba(160,100,255,0.1); display:flex; align-items:flex-start; justify-content:space-between; gap:16px; background:rgba(20,0,50,0.4); }
+#lr-title { font-family:'Orbitron',monospace; font-size:18px; font-weight:700; color:#e6f0ff; letter-spacing:1px; }
+#lr-eyebrow { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:4px; color:rgba(160,100,255,0.7); text-transform:uppercase; margin-bottom:6px; }
+#lr-close { background:none; border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.5); width:36px; height:36px; border-radius:8px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; flex-shrink:0; }
+#lr-close:hover { background:rgba(255,255,255,0.1); color:#fff; }
+#lr-server-badge { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:1px; padding:5px 12px; border-radius:20px; border:1px solid rgba(160,100,255,0.25); color:rgba(160,100,255,0.6); background:rgba(160,100,255,0.06); white-space:nowrap; }
+
+#lr-tabs { display:flex; gap:8px; padding:16px 28px; border-bottom:1px solid rgba(160,100,255,0.08); flex-wrap:wrap; background:rgba(10,0,30,0.3); }
+.lr-tab { padding:8px 18px; border-radius:8px; border:1px solid rgba(160,100,255,0.2); background:none; font-size:12px; font-family:'Share Tech Mono',monospace; letter-spacing:1px; color:rgba(160,100,255,0.5); cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
+.lr-tab:hover { border-color:rgba(200,160,255,0.5); color:rgba(200,160,255,0.9); }
+.lr-tab.active { background:rgba(160,100,255,0.12); border-color:#b06eff; color:#c89eff; }
+
+#lr-body { padding:28px; flex:1; min-height:400px; }
+
+/* LR status bar — purple accent */
+.lr-status-bar { display:flex; align-items:center; gap:12px; padding:12px 16px; background:rgba(160,100,255,0.06); border:1px solid rgba(160,100,255,0.14); border-radius:10px; margin-bottom:24px; font-family:'Share Tech Mono',monospace; font-size:11px; }
+.lr-status-dot { width:8px; height:8px; border-radius:50%; background:#c89eff; box-shadow:0 0 8px rgba(180,120,255,0.6); flex-shrink:0; }
+.lr-status-dot.err { background:#ff4c4c; box-shadow:0 0 8px rgba(255,76,76,0.6); }
+#lr-status-text { color:rgba(200,180,255,0.7); }
+
+/* LR file table */
+.lr-file-table { width:100%; border-collapse:collapse; font-size:12px; font-family:'Share Tech Mono',monospace; margin-bottom:28px; }
+.lr-file-table th { text-align:left; color:rgba(160,100,255,0.55); font-size:9px; letter-spacing:2px; text-transform:uppercase; padding:8px 12px; border-bottom:1px solid rgba(160,100,255,0.1); }
+.lr-file-table td { padding:9px 12px; border-bottom:1px solid rgba(255,255,255,0.04); color:#d0c0ff; vertical-align:top; }
+.lr-file-table tr:hover td { background:rgba(160,100,255,0.05); }
+.lr-badge-csv  { font-size:8px; padding:2px 8px; border-radius:10px; letter-spacing:1px; background:rgba(76,200,255,0.12); color:#79c0ff; border:1px solid rgba(76,200,255,0.25); }
+.lr-badge-pkl  { font-size:8px; padding:2px 8px; border-radius:10px; letter-spacing:1px; background:rgba(255,170,60,0.12); color:#ffaa44; border:1px solid rgba(255,170,60,0.25); }
+
+/* LR CSV preview table */
+.lr-preview-wrap { overflow-x:auto; margin-top:6px; }
+.lr-preview-table { border-collapse:collapse; font-size:10px; font-family:'Share Tech Mono',monospace; min-width:100%; }
+.lr-preview-table th { background:rgba(160,100,255,0.1); color:rgba(200,160,255,0.8); padding:5px 10px; border:1px solid rgba(160,100,255,0.12); text-align:left; white-space:nowrap; }
+.lr-preview-table td { padding:4px 10px; border:1px solid rgba(255,255,255,0.05); color:rgba(220,210,255,0.75); white-space:nowrap; }
+.lr-preview-table tr:hover td { background:rgba(160,100,255,0.04); }
+.lr-csv-expand { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; text-transform:uppercase; background:none; border:1px solid rgba(160,100,255,0.2); color:rgba(160,100,255,0.55); padding:4px 12px; border-radius:6px; cursor:pointer; margin-top:8px; transition:all 0.2s; }
+.lr-csv-expand:hover { border-color:rgba(160,100,255,0.5); color:rgba(200,160,255,0.9); }
+
+/* LR plots grid — reuse cnn pattern with purple tint */
+.lr-plot-section-title { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:3px; color:rgba(160,100,255,0.5); text-transform:uppercase; margin:0 0 14px; display:flex; align-items:center; gap:12px; }
+.lr-plot-section-title::after { content:''; flex:1; height:1px; background:rgba(160,100,255,0.1); }
+.lr-plots-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; margin-bottom:32px; }
+.lr-plot-card { background:rgba(10,0,30,0.6); border:1px solid rgba(160,100,255,0.12); border-radius:12px; overflow:hidden; cursor:pointer; transition:border-color 0.2s, transform 0.2s; }
+.lr-plot-card:hover { border-color:rgba(160,100,255,0.4); transform:translateY(-2px); }
+.lr-plot-card img { width:100%; display:block; background:#080014; }
+.lr-plot-label { padding:10px 14px; font-family:'Share Tech Mono',monospace; font-size:10px; color:rgba(160,100,255,0.65); letter-spacing:1px; text-transform:uppercase; }
+
+.lr-loading { text-align:center; padding:60px 0; font-family:'Share Tech Mono',monospace; font-size:12px; color:rgba(160,100,255,0.4); letter-spacing:2px; }
+.lr-loading::after { content:''; display:block; width:32px; height:32px; border:2px solid rgba(160,100,255,0.15); border-top-color:#b06eff; border-radius:50%; animation:spin 0.8s linear infinite; margin:16px auto 0; }
+.lr-error { padding:24px; background:rgba(255,60,60,0.07); border:1px solid rgba(255,60,60,0.2); border-radius:10px; font-family:'Share Tech Mono',monospace; font-size:12px; color:#ff8080; line-height:1.8; }
+
+/* ═══ XGB MODAL — amber/orange accent ═══ */
+#xgb-overlay { display:none; position:fixed; inset:0; z-index:500; background:rgba(4,10,24,0.85); backdrop-filter:blur(8px); align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; }
+#xgb-overlay.open { display:flex; }
+#xgb-modal { background:#0b1323; border:1px solid rgba(255,160,40,0.18); border-radius:20px; width:100%; max-width:1200px; margin:auto; box-shadow:0 40px 100px rgba(0,0,0,0.7); display:flex; flex-direction:column; overflow:hidden; }
+
+#xgb-header { padding:24px 28px 16px; border-bottom:1px solid rgba(255,160,40,0.1); display:flex; align-items:flex-start; justify-content:space-between; gap:16px; background:rgba(40,20,0,0.4); }
+#xgb-title { font-family:'Orbitron',monospace; font-size:18px; font-weight:700; color:#e6f0ff; letter-spacing:1px; }
+#xgb-eyebrow { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:4px; color:rgba(255,160,40,0.7); text-transform:uppercase; margin-bottom:6px; }
+#xgb-close { background:none; border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.5); width:36px; height:36px; border-radius:8px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; flex-shrink:0; }
+#xgb-close:hover { background:rgba(255,255,255,0.1); color:#fff; }
+#xgb-server-badge { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:1px; padding:5px 12px; border-radius:20px; border:1px solid rgba(255,160,40,0.25); color:rgba(255,160,40,0.65); background:rgba(255,160,40,0.06); white-space:nowrap; }
+
+/* Run selector tabs at top level */
+#xgb-run-tabs { display:flex; gap:0; border-bottom:1px solid rgba(255,160,40,0.1); background:rgba(20,10,0,0.4); }
+.xgb-run-tab { flex:1; padding:14px 20px; background:none; border:none; border-right:1px solid rgba(255,160,40,0.1); font-family:'Share Tech Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,160,40,0.4); cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px; }
+.xgb-run-tab:last-child { border-right:none; }
+.xgb-run-tab:hover { background:rgba(255,160,40,0.06); color:rgba(255,160,40,0.8); }
+.xgb-run-tab.active { background:rgba(255,160,40,0.1); color:#ffaa44; border-bottom:2px solid #ffaa44; }
+.xgb-run-badge { font-size:8px; padding:2px 8px; border-radius:10px; background:rgba(255,160,40,0.15); color:#ffaa44; border:1px solid rgba(255,160,40,0.3); }
+
+/* Section tabs within a run */
+#xgb-tabs { display:flex; gap:8px; padding:14px 28px; border-bottom:1px solid rgba(255,160,40,0.08); flex-wrap:wrap; background:rgba(15,8,0,0.3); }
+.xgb-tab { padding:8px 18px; border-radius:8px; border:1px solid rgba(255,160,40,0.18); background:none; font-size:12px; font-family:'Share Tech Mono',monospace; letter-spacing:1px; color:rgba(255,160,40,0.45); cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
+.xgb-tab:hover { border-color:rgba(255,180,80,0.5); color:rgba(255,180,80,0.9); }
+.xgb-tab.active { background:rgba(255,160,40,0.12); border-color:#ffaa44; color:#ffcc77; }
+
+#xgb-body { padding:28px; flex:1; min-height:420px; }
+
+/* Report panel */
+#xgb-report-panel {}
+.xgb-report-box { background:rgba(255,160,40,0.04); border:1px solid rgba(255,160,40,0.12); border-radius:12px; padding:22px 24px; font-family:'Share Tech Mono',monospace; font-size:12px; line-height:1.9; color:#e0d4b8; white-space:pre-wrap; max-height:480px; overflow-y:auto; }
+.xgb-report-box::-webkit-scrollbar { width:6px; }
+.xgb-report-box::-webkit-scrollbar-thumb { background:rgba(255,160,40,0.25); border-radius:3px; }
+
+/* Status bar */
+.xgb-status-bar { display:flex; align-items:center; gap:12px; padding:12px 16px; background:rgba(255,160,40,0.05); border:1px solid rgba(255,160,40,0.12); border-radius:10px; margin-bottom:24px; font-family:'Share Tech Mono',monospace; font-size:11px; }
+.xgb-status-dot { width:8px; height:8px; border-radius:50%; background:#ffaa44; box-shadow:0 0 8px rgba(255,160,40,0.6); flex-shrink:0; }
+.xgb-status-dot.err { background:#ff4c4c; box-shadow:0 0 8px rgba(255,76,76,0.6); }
+
+/* Plots grid */
+.xgb-plot-section-title { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:3px; color:rgba(255,160,40,0.5); text-transform:uppercase; margin:0 0 14px; display:flex; align-items:center; gap:12px; }
+.xgb-plot-section-title::after { content:''; flex:1; height:1px; background:rgba(255,160,40,0.1); }
+.xgb-plots-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; margin-bottom:32px; }
+.xgb-plot-card { background:rgba(20,10,0,0.6); border:1px solid rgba(255,160,40,0.12); border-radius:12px; overflow:hidden; cursor:pointer; transition:border-color 0.2s, transform 0.2s; }
+.xgb-plot-card:hover { border-color:rgba(255,160,40,0.4); transform:translateY(-2px); }
+.xgb-plot-card img { width:100%; display:block; background:#0a0500; }
+.xgb-plot-label { padding:10px 14px; font-family:'Share Tech Mono',monospace; font-size:10px; color:rgba(255,160,40,0.65); letter-spacing:1px; text-transform:uppercase; }
+
+/* Data/model table */
+.xgb-file-table { width:100%; border-collapse:collapse; font-size:12px; font-family:'Share Tech Mono',monospace; margin-bottom:24px; }
+.xgb-file-table th { text-align:left; color:rgba(255,160,40,0.55); font-size:9px; letter-spacing:2px; text-transform:uppercase; padding:8px 12px; border-bottom:1px solid rgba(255,160,40,0.1); }
+.xgb-file-table td { padding:9px 12px; border-bottom:1px solid rgba(255,255,255,0.04); color:#e0c890; vertical-align:top; }
+.xgb-file-table tr:hover td { background:rgba(255,160,40,0.04); }
+.xgb-badge-csv { font-size:8px; padding:2px 8px; border-radius:10px; background:rgba(76,200,255,0.12); color:#79c0ff; border:1px solid rgba(76,200,255,0.25); }
+.xgb-badge-pkl { font-size:8px; padding:2px 8px; border-radius:10px; background:rgba(255,170,60,0.12); color:#ffaa44; border:1px solid rgba(255,170,60,0.25); }
+
+/* CSV preview table */
+.xgb-preview-wrap { overflow-x:auto; margin-top:6px; }
+.xgb-preview-table { border-collapse:collapse; font-size:10px; font-family:'Share Tech Mono',monospace; min-width:100%; }
+.xgb-preview-table th { background:rgba(255,160,40,0.1); color:rgba(255,200,100,0.8); padding:5px 10px; border:1px solid rgba(255,160,40,0.12); text-align:left; white-space:nowrap; }
+.xgb-preview-table td { padding:4px 10px; border:1px solid rgba(255,255,255,0.05); color:rgba(240,220,160,0.75); white-space:nowrap; }
+.xgb-preview-table tr:hover td { background:rgba(255,160,40,0.04); }
+.xgb-csv-expand { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; text-transform:uppercase; background:none; border:1px solid rgba(255,160,40,0.2); color:rgba(255,160,40,0.5); padding:4px 12px; border-radius:6px; cursor:pointer; margin-top:8px; transition:all 0.2s; }
+.xgb-csv-expand:hover { border-color:rgba(255,160,40,0.55); color:rgba(255,190,80,0.9); }
+
+.xgb-loading { text-align:center; padding:60px 0; font-family:'Share Tech Mono',monospace; font-size:12px; color:rgba(255,160,40,0.4); letter-spacing:2px; }
+.xgb-loading::after { content:''; display:block; width:32px; height:32px; border:2px solid rgba(255,160,40,0.15); border-top-color:#ffaa44; border-radius:50%; animation:spin 0.8s linear infinite; margin:16px auto 0; }
+.xgb-error { padding:24px; background:rgba(255,60,60,0.07); border:1px solid rgba(255,60,60,0.2); border-radius:10px; font-family:'Share Tech Mono',monospace; font-size:12px; color:#ff8080; line-height:1.8; }
+
+/* ═══ OPTIMISATION MODAL — amber/gold accent ═══ */
+#opt-overlay { display:none; position:fixed; inset:0; z-index:500; background:rgba(12,8,2,0.88); backdrop-filter:blur(8px); align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; }
+#opt-overlay.open { display:flex; }
+#opt-modal { background:#120e04; border:1px solid rgba(251,191,36,0.18); border-radius:20px; width:100%; max-width:1100px; margin:auto; box-shadow:0 40px 100px rgba(0,0,0,0.75); display:flex; flex-direction:column; overflow:hidden; }
+
+#opt-header { padding:24px 28px 16px; border-bottom:1px solid rgba(251,191,36,0.1); display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; background:rgba(30,20,0,0.5); }
+#opt-eyebrow { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:4px; color:rgba(251,191,36,0.65); text-transform:uppercase; margin-bottom:6px; }
+#opt-title { font-family:'Orbitron',monospace; font-size:18px; font-weight:700; color:#fff8e1; letter-spacing:1px; }
+#opt-header-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+#opt-server-badge { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:1px; padding:5px 12px; border-radius:20px; border:1px solid rgba(251,191,36,0.25); color:rgba(251,191,36,0.6); background:rgba(251,191,36,0.06); white-space:nowrap; }
+#opt-close { background:none; border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.5); width:36px; height:36px; border-radius:8px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; flex-shrink:0; }
+#opt-close:hover { background:rgba(255,255,255,0.1); color:#fff; }
+
+/* Run tabs: 9.1 / 9.2 / 9.3 / 9.4 / Curve */
+#opt-run-tabs { display:flex; gap:8px; padding:16px 28px 0; flex-wrap:wrap; background:rgba(20,14,0,0.4); }
+.opt-rtab { padding:9px 20px; border-radius:8px 8px 0 0; border:1px solid rgba(251,191,36,0.18); border-bottom:none; background:none; font-size:12px; font-family:'Share Tech Mono',monospace; letter-spacing:1.5px; color:rgba(251,191,36,0.45); cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
+.opt-rtab:hover { border-color:rgba(251,191,36,0.45); color:rgba(251,191,36,0.85); }
+.opt-rtab.active { background:rgba(251,191,36,0.1); border-color:rgba(251,191,36,0.5); color:#fbbf24; }
+.opt-rtab.curve-tab { border-color:rgba(167,243,208,0.2); color:rgba(167,243,208,0.45); }
+.opt-rtab.curve-tab:hover { border-color:rgba(167,243,208,0.5); color:rgba(167,243,208,0.9); }
+.opt-rtab.curve-tab.active { background:rgba(167,243,208,0.08); border-color:rgba(167,243,208,0.5); color:#a7f3d0; }
+
+/* Inner tabs for Curve view: Graphs / Data */
+#opt-curve-inner-tabs { display:none; gap:6px; padding:10px 28px 0; background:rgba(10,10,5,0.3); }
+#opt-curve-inner-tabs.visible { display:flex; }
+.opt-citab { padding:7px 18px; border-radius:8px; border:1px solid rgba(167,243,208,0.15); background:none; font-size:11px; font-family:'Share Tech Mono',monospace; letter-spacing:1px; color:rgba(167,243,208,0.4); cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
+.opt-citab:hover { border-color:rgba(167,243,208,0.4); color:rgba(167,243,208,0.8); }
+.opt-citab.active { background:rgba(167,243,208,0.08); border-color:rgba(167,243,208,0.5); color:#a7f3d0; }
+
+#opt-tab-bar-bottom { height:1px; background:rgba(251,191,36,0.08); margin:0 0 0; }
+
+#opt-body { padding:28px; flex:1; min-height:420px; }
+
+/* Status bar */
+.opt-status-bar { display:flex; align-items:center; gap:12px; padding:12px 16px; background:rgba(251,191,36,0.05); border:1px solid rgba(251,191,36,0.12); border-radius:10px; margin-bottom:24px; font-family:'Share Tech Mono',monospace; font-size:11px; }
+.opt-status-dot { width:8px; height:8px; border-radius:50%; background:#fbbf24; box-shadow:0 0 8px rgba(251,191,36,0.6); flex-shrink:0; animation:livePulse 1.8s infinite; }
+.opt-status-dot.err  { background:#ff4c4c; box-shadow:0 0 8px rgba(255,76,76,0.6);  animation:none; }
+.opt-status-dot.warn { background:#ffd44c; animation:none; }
+#opt-status-text { color:rgba(255,235,160,0.75); }
+
+/* Info cards */
+.opt-info-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; margin-bottom:28px; }
+.opt-info-card { background:rgba(251,191,36,0.04); border:1px solid rgba(251,191,36,0.1); border-radius:10px; padding:14px 16px; }
+.opt-info-k { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:2px; color:rgba(251,191,36,0.5); text-transform:uppercase; margin-bottom:5px; }
+.opt-info-v { font-size:13px; color:#fff3c4; font-weight:600; word-break:break-all; }
+
+/* Plots */
+.opt-plot-section-title { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:3px; color:rgba(251,191,36,0.5); text-transform:uppercase; margin:0 0 14px; display:flex; align-items:center; gap:12px; }
+.opt-plot-section-title::after { content:''; flex:1; height:1px; background:rgba(251,191,36,0.1); }
+.opt-plots-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; margin-bottom:32px; }
+.opt-plot-card { background:rgba(20,14,0,0.7); border:1px solid rgba(251,191,36,0.12); border-radius:12px; overflow:hidden; cursor:pointer; transition:border-color 0.2s,transform 0.2s; }
+.opt-plot-card:hover { border-color:rgba(251,191,36,0.4); transform:translateY(-2px); }
+.opt-plot-card img { width:100%; display:block; background:#0a0800; }
+.opt-plot-label { padding:10px 14px; font-family:'Share Tech Mono',monospace; font-size:10px; color:rgba(251,191,36,0.65); letter-spacing:1px; text-transform:uppercase; }
+
+/* Curve data table */
+.opt-file-table { width:100%; border-collapse:collapse; font-size:12px; font-family:'Share Tech Mono',monospace; margin-bottom:24px; }
+.opt-file-table th { text-align:left; color:rgba(167,243,208,0.55); font-size:9px; letter-spacing:2px; text-transform:uppercase; padding:8px 12px; border-bottom:1px solid rgba(167,243,208,0.1); }
+.opt-file-table td { padding:9px 12px; border-bottom:1px solid rgba(255,255,255,0.04); color:#c0f0d8; vertical-align:top; }
+.opt-file-table tr:hover td { background:rgba(167,243,208,0.04); }
+.opt-badge-csv { font-size:8px; padding:2px 8px; border-radius:10px; background:rgba(76,200,255,0.12); color:#79c0ff; border:1px solid rgba(76,200,255,0.25); }
+
+.opt-preview-wrap { overflow-x:auto; margin-top:6px; }
+.opt-preview-table { border-collapse:collapse; font-size:10px; font-family:'Share Tech Mono',monospace; min-width:100%; }
+.opt-preview-table th { background:rgba(167,243,208,0.1); color:rgba(167,243,208,0.85); padding:5px 10px; border:1px solid rgba(167,243,208,0.12); text-align:left; white-space:nowrap; }
+.opt-preview-table td { padding:4px 10px; border:1px solid rgba(255,255,255,0.05); color:rgba(190,240,220,0.75); white-space:nowrap; }
+.opt-preview-table tr:hover td { background:rgba(167,243,208,0.04); }
+.opt-csv-expand { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; text-transform:uppercase; background:none; border:1px solid rgba(167,243,208,0.2); color:rgba(167,243,208,0.55); padding:4px 12px; border-radius:6px; cursor:pointer; margin-top:8px; transition:all 0.2s; }
+.opt-csv-expand:hover { border-color:rgba(167,243,208,0.5); color:rgba(167,243,208,0.9); }
+
+/* Loading / error */
+.opt-loading { text-align:center; padding:60px 0; font-family:'Share Tech Mono',monospace; font-size:12px; color:rgba(251,191,36,0.4); letter-spacing:2px; }
+.opt-loading::after { content:''; display:block; width:32px; height:32px; border:2px solid rgba(251,191,36,0.15); border-top-color:#fbbf24; border-radius:50%; animation:spin 0.8s linear infinite; margin:16px auto 0; }
+.opt-error { padding:24px; background:rgba(255,60,60,0.07); border:1px solid rgba(255,60,60,0.2); border-radius:10px; font-family:'Share Tech Mono',monospace; font-size:12px; color:#ff8080; line-height:1.8; }
+
+/* ═══ LSTM MODAL — teal/green accent ═══ */
+#lstm-overlay { display:none; position:fixed; inset:0; z-index:500; background:rgba(2,12,10,0.88); backdrop-filter:blur(8px); align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; }
+#lstm-overlay.open { display:flex; }
+#lstm-modal { background:#0a1410; border:1px solid rgba(52,211,153,0.18); border-radius:20px; width:100%; max-width:1100px; margin:auto; box-shadow:0 40px 100px rgba(0,0,0,0.75); display:flex; flex-direction:column; overflow:hidden; }
+
+#lstm-header { padding:24px 28px 16px; border-bottom:1px solid rgba(52,211,153,0.1); display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; background:rgba(0,30,20,0.5); }
+#lstm-eyebrow { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:4px; color:rgba(52,211,153,0.65); text-transform:uppercase; margin-bottom:6px; }
+#lstm-title { font-family:'Orbitron',monospace; font-size:18px; font-weight:700; color:#e6fff8; letter-spacing:1px; }
+#lstm-header-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+#lstm-server-badge { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:1px; padding:5px 12px; border-radius:20px; border:1px solid rgba(52,211,153,0.25); color:rgba(52,211,153,0.6); background:rgba(52,211,153,0.06); white-space:nowrap; }
+#lstm-close { background:none; border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.5); width:36px; height:36px; border-radius:8px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; flex-shrink:0; }
+#lstm-close:hover { background:rgba(255,255,255,0.1); color:#fff; }
+
+/* Variant tabs (10 / 30 / kp) */
+#lstm-variant-tabs { display:flex; gap:8px; padding:16px 28px 0; flex-wrap:wrap; background:rgba(0,20,15,0.4); }
+.lstm-vtab { padding:9px 22px; border-radius:8px 8px 0 0; border:1px solid rgba(52,211,153,0.18); border-bottom:none; background:none; font-size:12px; font-family:'Share Tech Mono',monospace; letter-spacing:1.5px; color:rgba(52,211,153,0.45); cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
+.lstm-vtab:hover { border-color:rgba(52,211,153,0.45); color:rgba(52,211,153,0.85); }
+.lstm-vtab.active { background:rgba(52,211,153,0.1); border-color:rgba(52,211,153,0.5); color:#34d399; }
+
+/* Inner tabs (Graphs / Data) */
+#lstm-inner-tabs { display:flex; gap:6px; padding:16px 28px; border-bottom:1px solid rgba(52,211,153,0.08); background:rgba(0,15,10,0.35); }
+.lstm-itab { padding:7px 18px; border-radius:8px; border:1px solid rgba(52,211,153,0.15); background:none; font-size:11px; font-family:'Share Tech Mono',monospace; letter-spacing:1px; color:rgba(52,211,153,0.4); cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
+.lstm-itab:hover { border-color:rgba(52,211,153,0.4); color:rgba(52,211,153,0.8); }
+.lstm-itab.active { background:rgba(52,211,153,0.1); border-color:#34d399; color:#34d399; }
+
+#lstm-body { padding:28px; flex:1; min-height:420px; }
+
+/* Status bar */
+.lstm-status-bar { display:flex; align-items:center; gap:12px; padding:12px 16px; background:rgba(52,211,153,0.05); border:1px solid rgba(52,211,153,0.12); border-radius:10px; margin-bottom:24px; font-family:'Share Tech Mono',monospace; font-size:11px; }
+.lstm-status-dot { width:8px; height:8px; border-radius:50%; background:#34d399; box-shadow:0 0 8px rgba(52,211,153,0.6); flex-shrink:0; animation:livePulse 1.8s infinite; }
+.lstm-status-dot.err { background:#ff4c4c; box-shadow:0 0 8px rgba(255,76,76,0.6); animation:none; }
+.lstm-status-dot.warn { background:#ffd44c; animation:none; }
+#lstm-status-text { color:rgba(160,220,200,0.75); }
+
+/* Variant info cards */
+.lstm-info-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; margin-bottom:28px; }
+.lstm-info-card { background:rgba(52,211,153,0.04); border:1px solid rgba(52,211,153,0.1); border-radius:10px; padding:14px 16px; }
+.lstm-info-k { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:2px; color:rgba(52,211,153,0.5); text-transform:uppercase; margin-bottom:5px; }
+.lstm-info-v { font-size:13px; color:#b0ffe0; font-weight:600; word-break:break-all; }
+
+/* Plots grid */
+.lstm-plot-section-title { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:3px; color:rgba(52,211,153,0.5); text-transform:uppercase; margin:0 0 14px; display:flex; align-items:center; gap:12px; }
+.lstm-plot-section-title::after { content:''; flex:1; height:1px; background:rgba(52,211,153,0.1); }
+.lstm-plots-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; margin-bottom:32px; }
+.lstm-plot-card { background:rgba(0,20,14,0.7); border:1px solid rgba(52,211,153,0.12); border-radius:12px; overflow:hidden; cursor:pointer; transition:border-color 0.2s,transform 0.2s; }
+.lstm-plot-card:hover { border-color:rgba(52,211,153,0.4); transform:translateY(-2px); }
+.lstm-plot-card img { width:100%; display:block; background:#030f0a; }
+.lstm-plot-label { padding:10px 14px; font-family:'Share Tech Mono',monospace; font-size:10px; color:rgba(52,211,153,0.65); letter-spacing:1px; text-transform:uppercase; }
+
+/* File tables */
+.lstm-file-table { width:100%; border-collapse:collapse; font-size:12px; font-family:'Share Tech Mono',monospace; margin-bottom:24px; }
+.lstm-file-table th { text-align:left; color:rgba(52,211,153,0.55); font-size:9px; letter-spacing:2px; text-transform:uppercase; padding:8px 12px; border-bottom:1px solid rgba(52,211,153,0.1); }
+.lstm-file-table td { padding:9px 12px; border-bottom:1px solid rgba(255,255,255,0.04); color:#b0ffe0; vertical-align:top; }
+.lstm-file-table tr:hover td { background:rgba(52,211,153,0.04); }
+.lstm-badge-csv   { font-size:8px; padding:2px 8px; border-radius:10px; background:rgba(76,200,255,0.12); color:#79c0ff; border:1px solid rgba(76,200,255,0.25); }
+.lstm-badge-pkl   { font-size:8px; padding:2px 8px; border-radius:10px; background:rgba(255,170,60,0.12); color:#ffaa44; border:1px solid rgba(255,170,60,0.25); }
+.lstm-badge-keras { font-size:8px; padding:2px 8px; border-radius:10px; background:rgba(255,80,80,0.12); color:#ff8080; border:1px solid rgba(255,80,80,0.25); }
+
+/* CSV preview */
+.lstm-preview-wrap { overflow-x:auto; margin-top:6px; }
+.lstm-preview-table { border-collapse:collapse; font-size:10px; font-family:'Share Tech Mono',monospace; min-width:100%; }
+.lstm-preview-table th { background:rgba(52,211,153,0.1); color:rgba(120,255,200,0.85); padding:5px 10px; border:1px solid rgba(52,211,153,0.12); text-align:left; white-space:nowrap; }
+.lstm-preview-table td { padding:4px 10px; border:1px solid rgba(255,255,255,0.05); color:rgba(160,240,210,0.75); white-space:nowrap; }
+.lstm-preview-table tr:hover td { background:rgba(52,211,153,0.04); }
+.lstm-csv-expand { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; text-transform:uppercase; background:none; border:1px solid rgba(52,211,153,0.2); color:rgba(52,211,153,0.55); padding:4px 12px; border-radius:6px; cursor:pointer; margin-top:8px; transition:all 0.2s; }
+.lstm-csv-expand:hover { border-color:rgba(52,211,153,0.5); color:rgba(100,255,190,0.9); }
+
+/* Loading / error states */
+.lstm-loading { text-align:center; padding:60px 0; font-family:'Share Tech Mono',monospace; font-size:12px; color:rgba(52,211,153,0.4); letter-spacing:2px; }
+.lstm-loading::after { content:''; display:block; width:32px; height:32px; border:2px solid rgba(52,211,153,0.15); border-top-color:#34d399; border-radius:50%; animation:spin 0.8s linear infinite; margin:16px auto 0; }
+.lstm-error { padding:24px; background:rgba(255,60,60,0.07); border:1px solid rgba(255,60,60,0.2); border-radius:10px; font-family:'Share Tech Mono',monospace; font-size:12px; color:#ff8080; line-height:1.8; }
+
+/* ═══ CNN RUNNER ═══ */
+#cnn-overlay { display:none; position:fixed; inset:0; z-index:500; background:rgba(4,10,24,0.85); backdrop-filter:blur(8px); align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; }
+#cnn-overlay.open { display:flex; }
+#cnn-modal { background:#0b1323; border:1px solid rgba(0,200,255,0.15); border-radius:20px; width:100%; max-width:1100px; margin:auto; box-shadow:0 40px 100px rgba(0,0,0,0.7); display:flex; flex-direction:column; overflow:hidden; }
+
+#cnn-header { padding:24px 28px 16px; border-bottom:1px solid rgba(0,200,255,0.1); display:flex; align-items:flex-start; justify-content:space-between; gap:16px; background:rgba(0,20,50,0.5); }
+#cnn-title { font-family:'Orbitron',monospace; font-size:18px; font-weight:700; color:#e6f0ff; letter-spacing:1px; }
+#cnn-eyebrow { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:4px; color:rgba(0,200,255,0.6); text-transform:uppercase; margin-bottom:6px; }
+#cnn-close { background:none; border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.5); width:36px; height:36px; border-radius:8px; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; flex-shrink:0; }
+#cnn-close:hover { background:rgba(255,255,255,0.1); color:#fff; }
+
+#cnn-tabs { display:flex; gap:8px; padding:16px 28px; border-bottom:1px solid rgba(0,200,255,0.08); flex-wrap:wrap; background:rgba(0,10,30,0.3); }
+.cnn-tab { padding:8px 18px; border-radius:8px; border:1px solid rgba(0,200,255,0.2); background:none; font-size:12px; font-family:'Share Tech Mono',monospace; letter-spacing:1px; color:rgba(0,200,255,0.5); cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
+.cnn-tab:hover { border-color:rgba(0,200,255,0.5); color:rgba(0,200,255,0.85); }
+.cnn-tab.active { background:rgba(0,200,255,0.12); border-color:#00c8ff; color:#00e5ff; }
+
+#cnn-body { padding:28px; flex:1; min-height:400px; }
+
+/* Summary panel */
+#cnn-summary-panel {}
+.cnn-status-bar { display:flex; align-items:center; gap:12px; padding:12px 16px; background:rgba(0,200,255,0.06); border:1px solid rgba(0,200,255,0.12); border-radius:10px; margin-bottom:24px; font-family:'Share Tech Mono',monospace; font-size:11px; }
+.cnn-status-dot { width:8px; height:8px; border-radius:50%; background:#4cff88; box-shadow:0 0 8px rgba(76,255,136,0.6); flex-shrink:0; }
+.cnn-status-dot.err { background:#ff4c4c; box-shadow:0 0 8px rgba(255,76,76,0.6); }
+.cnn-status-dot.warn { background:#ffd44c; box-shadow:0 0 8px rgba(255,212,76,0.6); }
+#cnn-status-text { color:rgba(200,230,255,0.7); }
+
+.cnn-meta-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin-bottom:28px; }
+.cnn-meta-card { background:rgba(0,200,255,0.04); border:1px solid rgba(0,200,255,0.1); border-radius:10px; padding:14px 16px; }
+.cnn-meta-k { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:2px; color:rgba(0,200,255,0.5); text-transform:uppercase; margin-bottom:5px; }
+.cnn-meta-v { font-size:13px; color:#e0eeff; font-weight:600; word-break:break-all; }
+
+.cnn-model-table { width:100%; border-collapse:collapse; font-size:12px; font-family:'Share Tech Mono',monospace; }
+.cnn-model-table th { text-align:left; color:rgba(0,200,255,0.5); font-size:9px; letter-spacing:2px; text-transform:uppercase; padding:8px 12px; border-bottom:1px solid rgba(0,200,255,0.1); }
+.cnn-model-table td { padding:9px 12px; border-bottom:1px solid rgba(255,255,255,0.04); color:#c8deff; }
+.cnn-model-table tr:hover td { background:rgba(0,200,255,0.04); }
+.cnn-model-badge { font-size:8px; padding:2px 8px; border-radius:10px; letter-spacing:1px; }
+.badge-keras { background:rgba(255,120,0,0.15); color:#ff9040; border:1px solid rgba(255,120,0,0.3); }
+.badge-tflite { background:rgba(0,200,100,0.12); color:#4cff88; border:1px solid rgba(0,200,100,0.25); }
+
+/* Plot panels */
+#cnn-plots-panel { display:none; }
+.cnn-plot-section-title { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:3px; color:rgba(0,200,255,0.45); text-transform:uppercase; margin:0 0 14px; display:flex; align-items:center; gap:12px; }
+.cnn-plot-section-title::after { content:''; flex:1; height:1px; background:rgba(0,200,255,0.1); }
+.cnn-plots-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; margin-bottom:32px; }
+.cnn-plot-card { background:rgba(0,10,30,0.6); border:1px solid rgba(0,200,255,0.1); border-radius:12px; overflow:hidden; cursor:pointer; transition:border-color 0.2s, transform 0.2s; }
+.cnn-plot-card:hover { border-color:rgba(0,200,255,0.4); transform:translateY(-2px); }
+.cnn-plot-card img { width:100%; display:block; background:#050f20; }
+.cnn-plot-label { padding:10px 14px; font-family:'Share Tech Mono',monospace; font-size:10px; color:rgba(0,200,255,0.6); letter-spacing:1px; text-transform:uppercase; }
+
+/* Lightbox */
+#cnn-lightbox { display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.92); align-items:center; justify-content:center; padding:20px; }
+#cnn-lightbox.open { display:flex; }
+#cnn-lightbox img { max-width:100%; max-height:90vh; border-radius:8px; box-shadow:0 0 60px rgba(0,200,255,0.2); }
+#cnn-lb-close { position:absolute; top:20px; right:24px; background:none; border:1px solid rgba(255,255,255,0.2); color:#fff; width:40px; height:40px; border-radius:8px; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+#cnn-lb-label { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); font-family:'Share Tech Mono',monospace; font-size:11px; color:rgba(255,255,255,0.5); letter-spacing:2px; text-transform:uppercase; white-space:nowrap; }
+
+/* Loading state */
+.cnn-loading { text-align:center; padding:60px 0; font-family:'Share Tech Mono',monospace; font-size:12px; color:rgba(0,200,255,0.4); letter-spacing:2px; }
+.cnn-loading::after { content:''; display:block; width:32px; height:32px; border:2px solid rgba(0,200,255,0.15); border-top-color:#00c8ff; border-radius:50%; animation:spin 0.8s linear infinite; margin:16px auto 0; }
+.cnn-error { padding:24px; background:rgba(255,60,60,0.07); border:1px solid rgba(255,60,60,0.2); border-radius:10px; font-family:'Share Tech Mono',monospace; font-size:12px; color:#ff8080; line-height:1.8; }
+
+</style>
+</head>
+<body>
+
+<nav id="topnav">
+    <div class="nav-logo-text">Earth Live</div>
+    <div class="nav-links">
+        <a class="nav-btn" href="main.html">Overview</a>
+        <a class="nav-btn nav-btn--active" href="Approach.html">Approach</a>
+        <a class="nav-btn" href="Predictions__1_.html">AI Predictions</a>
+    </div>
+</nav>
+
+<section id="ap-hero">
+    <canvas id="ap-hero-canvas"></canvas>
+    <div id="ap-hero-overlay"></div>
+    <div id="ap-hero-text">
+        <span class="ap-eyebrow">Methodology &amp; Architecture</span>
+        <h1 id="ap-hero-title">Our Approach</h1>
+        <p id="ap-hero-sub">Six interconnected ML systems for aurora forecasting. Cards marked <strong>▶ Runnable</strong> can be executed directly in your browser — select a version and see the output live.</p>
+    </div>
+</section>
+
+<main id="ap-main">
+
+    <div class="ap-section-label">Six core systems — click to explore</div>
+    <div id="ap-cards-grid">
+
+        <div class="ap-card runnable" onclick="openRunner('math')">
+            <div class="run-badge">▶ Runnable</div>
+            <div class="ap-card-num">M</div>
+            <h3 class="ap-card-title">Math</h3>
+            <p class="ap-card-desc">Aurora probability and auroral boundary models enhanced with solar wind physics. Two versions: static simulation and live NOAA API fetch.</p>
+            <div class="ap-card-tags"><span class="ap-tag">Physics Model</span><span class="ap-tag">NOAA API</span><span class="ap-tag">Solar Wind</span><span class="ap-tag">Kp Index</span></div>
+        </div>
+
+        <div class="ap-card runnable" onclick="openCnn()">
+            <div class="run-badge">▶ Runnable</div>
+            <div class="ap-card-num">1</div>
+            <h3 class="ap-card-title">CNN+LSTM Image Pipeline</h3>
+            <p class="ap-card-desc">V5 hybrid deep learning pipeline: self-supervised CNN feature extraction with K-Means pseudo-labelling, multi-backbone classification (V1–V4), and an LSTM/Transformer temporal forecaster trained on ASK aurora imagery.</p>
+            <div class="ap-card-tags"><span class="ap-tag">TensorFlow</span><span class="ap-tag">CNN+LSTM</span><span class="ap-tag">K-Means</span><span class="ap-tag">Grad-CAM</span><span class="ap-tag">ASK Data</span></div>
+        </div>
+
+        <div class="ap-card runnable" onclick="openRunner('timeloc')">
+            <div class="run-badge">▶ Runnable</div>
+            <div class="ap-card-num">2</div>
+            <h3 class="ap-card-title">Time &amp; Location System</h3>
+            <p class="ap-card-desc">Location-specific 8-hour temporal aurora forecast. Two versions: physics-based time model and ML Random Forest prediction with colour and visibility analysis.</p>
+            <div class="ap-card-tags"><span class="ap-tag">Geolocation</span><span class="ap-tag">Temporal</span><span class="ap-tag">Random Forest</span><span class="ap-tag">NOAA API</span></div>
+        </div>
+
+        <div class="ap-card runnable" onclick="openLr()">
+            <div class="run-badge">▶ Runnable</div>
+            <div class="ap-card-num">3</div>
+            <h3 class="ap-card-title">Linear Regression</h3>
+            <p class="ap-card-desc">Kp and aurora activity prediction using linear regression on solar wind parameters. Includes trained model outputs, residual diagnostics, prediction vs actual plots, and CSV data exports.</p>
+            <div class="ap-card-tags"><span class="ap-tag">Linear Regression</span><span class="ap-tag">Kp Index</span><span class="ap-tag">Solar Wind</span><span class="ap-tag">Diagnostics</span></div>
+        </div>
+
+        <div class="ap-card runnable" onclick="openXgb()">
+            <div class="run-badge">▶ Runnable</div>
+            <div class="ap-card-num">4</div>
+            <h3 class="ap-card-title">XGBoost &amp; Random Forest</h3>
+            <p class="ap-card-desc">Two experimental runs of XGBoost and Random Forest models on structured solar wind parameters. Includes run reports, feature importance plots, residual diagnostics, prediction data, and serialised model files.</p>
+            <div class="ap-card-tags"><span class="ap-tag">XGBoost</span><span class="ap-tag">Random Forest</span><span class="ap-tag">Solar Wind</span><span class="ap-tag">Feature Importance</span></div>
+        </div>
+
+        <div class="ap-card runnable" onclick="openLstm()">
+            <div class="run-badge">▶ View Results</div>
+            <div class="ap-card-num">5</div>
+            <h3 class="ap-card-title">LSTM Networks</h3>
+            <p class="ap-card-desc">Three trained LSTM model variants for Kp forecasting — 10-step, 30-step ahead, and direct Kp prediction. Browse training plots, predictions, and serialised model files.</p>
+            <div class="ap-card-tags"><span class="ap-tag">LSTM</span><span class="ap-tag">BiLSTM</span><span class="ap-tag">Time Series</span><span class="ap-tag">Kp Forecast</span><span class="ap-tag">TensorFlow/Keras</span></div>
+        </div>
+
+        <div class="ap-card ap-card-wide runnable" onclick="openOpt()">
+            <div class="run-badge">▶ View Results</div>
+            <div class="ap-card-num">6</div>
+            <h3 class="ap-card-title">Optimisation Algorithms</h3>
+            <p class="ap-card-desc">Genetic Algorithms (GA) and Particle Swarm Optimisation (PSO) for hyperparameter tuning across four experiment runs (9.1–9.4), plus convergence curve analysis.</p>
+            <div class="ap-card-tags"><span class="ap-tag">Genetic Algorithm</span><span class="ap-tag">PSO</span><span class="ap-tag">Hyperparameter Tuning</span><span class="ap-tag">Convergence</span></div>
+        </div>
+
+    </div>
+
+    <div class="ap-section-label">End-to-end pipeline</div>
+    <div id="ap-pipeline-wrap">
+        <div id="ap-pipeline">
+            <div class="ap-pipe-step"><div class="ap-pipe-icon-wrap">🛰️</div><div class="ap-pipe-name">NOAA / NASA</div><div class="ap-pipe-sub">Raw Data</div></div>
+            <div class="ap-pipe-arrow">→</div>
+            <div class="ap-pipe-step"><div class="ap-pipe-icon-wrap">⚙️</div><div class="ap-pipe-name">Feature Engineering</div><div class="ap-pipe-sub">Kp · Dst · Bz</div></div>
+            <div class="ap-pipe-arrow">→</div>
+            <div class="ap-pipe-step"><div class="ap-pipe-icon-wrap">🧠</div><div class="ap-pipe-name">ML Ensemble + LSTM</div><div class="ap-pipe-sub">Forecast Model</div></div>
+            <div class="ap-pipe-arrow">→</div>
+            <div class="ap-pipe-step"><div class="ap-pipe-icon-wrap">🔬</div><div class="ap-pipe-name">Physics Validation</div><div class="ap-pipe-sub">OVATION Check</div></div>
+            <div class="ap-pipe-arrow">→</div>
+            <div class="ap-pipe-step"><div class="ap-pipe-icon-wrap">🌌</div><div class="ap-pipe-name">Aurora Forecast</div><div class="ap-pipe-sub">Probability · Visibility</div></div>
+        </div>
+    </div>
+
+</main>
+
+<footer id="ap-footer">
+    <span id="ap-footer-logo">EARTH LIVE</span>
+    Real-time space weather intelligence · Data sourced from
+    <a href="https://www.swpc.noaa.gov" target="_blank">NOAA SWPC</a>,
+    <a href="https://science.nasa.gov" target="_blank">NASA</a> and
+    <a href="https://www.esa.int" target="_blank">ESA</a>
+</footer>
+
+<!-- RUNNER MODAL -->
+<div id="runner-overlay" onclick="if(event.target===this)closeRunner()">
+<div id="runner-modal">
+
+    <div id="runner-header">
+        <div>
+            <div id="runner-algo-badge">Algorithm Runner</div>
+            <div id="runner-title">Loading…</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span id="server-badge" style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;padding:5px 12px;border-radius:20px;border:1px solid rgba(0,200,255,0.2);color:rgba(0,200,255,0.5);background:rgba(0,200,255,0.05);white-space:nowrap;">○ Checking server…</span>
+            <button id="runner-close" onclick="closeRunner()">✕</button>
+        </div>
+    </div>
+
+    <div id="runner-tabs"></div>
+
+    <div id="runner-body">
+        <p id="ver-desc"></p>
+        <button class="code-btn" onclick="toggleCode()">⟨/⟩ View Source Code</button>
+        <div class="code-wrap" id="code-wrap">
+            <div class="code-bar"><span id="code-fname">file.py</span><span>Python 3</span></div>
+            <div class="code-body"><pre id="code-pre"></pre></div>
+        </div>
+        <div id="params-wrap"></div>
+        <button id="run-btn" onclick="dispatch()">
+            <span class="run-icon">▶ Run Algorithm</span>
+            <div class="spinner"></div>
+        </button>
+        <div id="output-wrap">
+            <div class="out-header">
+                <span class="out-label">Output</span>
+                <span id="out-status" class="out-status s-ok">✓ Complete</span>
+            </div>
+            <div id="terminal"></div>
+            <div id="charts-grid"></div>
+        </div>
+    </div>
+
+</div>
+</div>
+
+
+
+<!-- ═══ XGB RUNNER MODAL ═══ -->
+<div id="xgb-overlay" onclick="if(event.target===this)closeXgb()">
+<div id="xgb-modal">
+
+    <div id="xgb-header">
+        <div>
+            <div id="xgb-eyebrow">XGBoost · Random Forest · Solar Wind · Two Runs</div>
+            <div id="xgb-title">XGBoost &amp; Random Forest Results</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span id="xgb-server-badge">○ Checking…</span>
+            <button id="xgb-close" onclick="closeXgb()">✕</button>
+        </div>
+    </div>
+
+    <!-- Run selector -->
+    <div id="xgb-run-tabs">
+        <button class="xgb-run-tab active" onclick="selectXgbRun('1',this)">
+            Run 1 <span class="xgb-run-badge">Variables Set A</span>
+        </button>
+        <button class="xgb-run-tab" onclick="selectXgbRun('2',this)">
+            Run 2 <span class="xgb-run-badge">Variables Set B</span>
+        </button>
+    </div>
+
+    <!-- Section tabs -->
+    <div id="xgb-tabs">
+        <button class="xgb-tab active" onclick="showXgbTab('report',this)">Report</button>
+        <button class="xgb-tab" onclick="showXgbTab('plots',this)">Plots</button>
+        <button class="xgb-tab" onclick="showXgbTab('data',this)">Data</button>
+        <button class="xgb-tab" onclick="showXgbTab('models',this)">Models</button>
+    </div>
+
+    <div id="xgb-body">
+        <div id="xgb-loading" class="xgb-loading">Loading XGBoost &amp; RF results…</div>
+        <div id="xgb-error" class="xgb-error" style="display:none;"></div>
+
+        <!-- Report tab -->
+        <div id="xgb-tab-report" style="display:none;">
+            <div class="xgb-status-bar">
+                <div class="xgb-status-dot" id="xgb-dot"></div>
+                <span id="xgb-status-text">Loading…</span>
+            </div>
+            <div class="xgb-plot-section-title">Run Report</div>
+            <pre class="xgb-report-box" id="xgb-report-text">No report found.</pre>
+        </div>
+
+        <!-- Plots tab -->
+        <div id="xgb-tab-plots" style="display:none;">
+            <div class="xgb-plot-section-title">Output Plots</div>
+            <div class="xgb-plots-grid" id="xgb-plots-grid"></div>
+        </div>
+
+        <!-- Data tab -->
+        <div id="xgb-tab-data" style="display:none;">
+            <div class="xgb-plot-section-title">CSV Data Files</div>
+            <div id="xgb-data-content"></div>
+        </div>
+
+        <!-- Models tab -->
+        <div id="xgb-tab-models" style="display:none;">
+            <div class="xgb-plot-section-title">Serialised Model Files</div>
+            <table class="xgb-file-table" id="xgb-models-table">
+                <thead><tr><th>File</th><th>Type</th><th>Size</th></tr></thead>
+                <tbody id="xgb-models-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<!-- ═══ LR RUNNER MODAL ═══ -->
+<div id="lr-overlay" onclick="if(event.target===this)closeLr()">
+<div id="lr-modal">
+
+    <div id="lr-header">
+        <div>
+            <div id="lr-eyebrow">Linear Regression · Solar Wind · Kp Prediction</div>
+            <div id="lr-title">Linear Regression Results</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span id="lr-server-badge">○ Checking…</span>
+            <button id="lr-close" onclick="closeLr()">✕</button>
+        </div>
+    </div>
+
+    <div id="lr-tabs">
+        <button class="lr-tab active" onclick="showLrTab('graphs',this)">Graphs</button>
+        <button class="lr-tab" onclick="showLrTab('data',this)">Data Files</button>
+    </div>
+
+    <div id="lr-body">
+        <div id="lr-loading" class="lr-loading">Loading Linear Regression results…</div>
+        <div id="lr-error" class="lr-error" style="display:none;"></div>
+
+        <!-- Graphs tab -->
+        <div id="lr-tab-graphs" style="display:none;">
+            <div class="lr-status-bar">
+                <div class="lr-status-dot" id="lr-dot"></div>
+                <span id="lr-status-text">Loading…</span>
+            </div>
+            <div class="lr-plot-section-title">Output Graphs</div>
+            <div class="lr-plots-grid" id="lr-plots-grid"></div>
+        </div>
+
+        <!-- Data files tab -->
+        <div id="lr-tab-data" style="display:none;">
+            <div class="lr-plot-section-title">Data Files</div>
+            <div id="lr-data-content"></div>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<!-- ═══ CNN LIGHTBOX ═══ -->
+<div id="cnn-lightbox" onclick="closeLightbox()">
+    <button id="cnn-lb-close" onclick="closeLightbox()">✕</button>
+    <img id="cnn-lb-img" src="" alt="">
+    <span id="cnn-lb-label"></span>
+</div>
+
+<!-- ═══ CNN RUNNER MODAL ═══ -->
+<div id="cnn-overlay" onclick="if(event.target===this)closeCnn()">
+<div id="cnn-modal">
+
+    <div id="cnn-header">
+        <div>
+            <div id="cnn-eyebrow">V5 Hybrid · CNN + LSTM · ASK Instrument</div>
+            <div id="cnn-title">Aurora CNN+LSTM Training Results</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span id="cnn-server-badge" style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;padding:5px 12px;border-radius:20px;border:1px solid rgba(0,200,255,0.2);color:rgba(0,200,255,0.5);background:rgba(0,200,255,0.05);white-space:nowrap;">○ Checking…</span>
+            <button id="cnn-close" onclick="closeCnn()">✕</button>
+        </div>
+    </div>
+
+    <div id="cnn-tabs">
+        <button class="cnn-tab active" onclick="showCnnTab('summary',this)">Summary &amp; Models</button>
+        <button class="cnn-tab" onclick="showCnnTab('clustering',this)">K-Means Clustering</button>
+        <button class="cnn-tab" onclick="showCnnTab('training',this)">Training Curves</button>
+        <button class="cnn-tab" onclick="showCnnTab('evaluation',this)">Evaluation</button>
+        <button class="cnn-tab" onclick="showCnnTab('embeddings',this)">Embeddings</button>
+        <button class="cnn-tab" onclick="showCnnTab('forecaster',this)">Forecaster</button>
+    </div>
+
+    <div id="cnn-body">
+        <div id="cnn-loading" class="cnn-loading">Loading CNN results…</div>
+        <div id="cnn-error" class="cnn-error" style="display:none;"></div>
+
+        <!-- Summary tab -->
+        <div id="cnn-tab-summary" style="display:none;">
+            <div class="cnn-status-bar">
+                <div class="cnn-status-dot" id="cnn-dot"></div>
+                <span id="cnn-status-text">Loading…</span>
+            </div>
+            <div class="cnn-meta-grid" id="cnn-meta-grid"></div>
+            <div class="cnn-plot-section-title">Exported Model Files</div>
+            <table class="cnn-model-table">
+                <thead><tr><th>File</th><th>Type</th><th>Size</th></tr></thead>
+                <tbody id="cnn-models-tbody"></tbody>
+            </table>
+        </div>
+
+        <!-- Clustering tab -->
+        <div id="cnn-tab-clustering" style="display:none;">
+            <div class="cnn-plot-section-title">Silhouette Sweep</div>
+            <div class="cnn-plots-grid" id="cnn-plots-clustering-sil"></div>
+            <div class="cnn-plot-section-title">Cluster Representatives</div>
+            <div class="cnn-plots-grid" id="cnn-plots-clustering-rep"></div>
+        </div>
+
+        <!-- Training tab -->
+        <div id="cnn-tab-training" style="display:none;">
+            <div class="cnn-plot-section-title">Per-Model Training Curves (Loss &amp; Accuracy)</div>
+            <div class="cnn-plots-grid" id="cnn-plots-training"></div>
+            <div class="cnn-plot-section-title">All-Model Validation Comparison</div>
+            <div class="cnn-plots-grid" id="cnn-plots-comparison"></div>
+        </div>
+
+        <!-- Evaluation tab -->
+        <div id="cnn-tab-evaluation" style="display:none;">
+            <div class="cnn-plot-section-title">Confusion Matrix — Best Model</div>
+            <div class="cnn-plots-grid" id="cnn-plots-confusion"></div>
+            <div class="cnn-plot-section-title">Grad-CAM Explainability</div>
+            <div class="cnn-plots-grid" id="cnn-plots-gradcam"></div>
+        </div>
+
+        <!-- Embeddings tab -->
+        <div id="cnn-tab-embeddings" style="display:none;">
+            <div class="cnn-plot-section-title">Embedding Space (PCA / UMAP)</div>
+            <div class="cnn-plots-grid" id="cnn-plots-embeddings"></div>
+        </div>
+
+        <!-- Forecaster tab -->
+        <div id="cnn-tab-forecaster" style="display:none;">
+            <div class="cnn-plot-section-title">Forecaster Training Curves</div>
+            <div class="cnn-plots-grid" id="cnn-plots-fc-curves"></div>
+            <div class="cnn-plot-section-title">Probability Trend Forecast</div>
+            <div class="cnn-plots-grid" id="cnn-plots-fc-trends"></div>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     OPTIMISATION MODAL
+════════════════════════════════════════════════════════ -->
+<div id="opt-overlay" onclick="if(event.target===this)closeOpt()">
+<div id="opt-modal">
+
+    <div id="opt-header">
+        <div>
+            <div id="opt-eyebrow">GA &amp; PSO · Hyperparameter Optimisation</div>
+            <div id="opt-title">Optimisation Algorithm Results</div>
+        </div>
+        <div id="opt-header-right">
+            <span id="opt-server-badge">○ Checking…</span>
+            <button id="opt-close" onclick="closeOpt()">✕</button>
+        </div>
+    </div>
+
+    <!-- Run tabs: 9.2 / 9.3 / 9.4 / 9.5 / Curve -->
+    <div id="opt-run-tabs">
+        <button class="opt-rtab active"    data-run="9.2"   onclick="optSelectRun('9.2',this)">Run 9.2</button>
+        <button class="opt-rtab"           data-run="9.3"   onclick="optSelectRun('9.3',this)">Run 9.3</button>
+        <button class="opt-rtab"           data-run="9.4"   onclick="optSelectRun('9.4',this)">Run 9.4</button>
+        <button class="opt-rtab"           data-run="9.5"   onclick="optSelectRun('9.5',this)">Run 9.5</button>
+        <button class="opt-rtab curve-tab" data-run="curve" onclick="optSelectRun('curve',this)">📈 Curve</button>
+    </div>
+
+    <!-- Inner tabs shown only for Curve -->
+    <div id="opt-curve-inner-tabs">
+        <button class="opt-citab active" data-itab="graphs" onclick="optSelectCurveInner('graphs',this)">📊 Graphs</button>
+        <button class="opt-citab"        data-itab="data"   onclick="optSelectCurveInner('data',this)">📁 Data (CSV)</button>
+    </div>
+
+    <div id="opt-tab-bar-bottom"></div>
+
+    <div id="opt-body">
+        <div id="opt-loading" class="opt-loading">Loading optimisation results…</div>
+        <div id="opt-error"   class="opt-error"   style="display:none"></div>
+
+        <div id="opt-content" style="display:none">
+            <div class="opt-status-bar">
+                <div class="opt-status-dot" id="opt-dot"></div>
+                <span id="opt-status-text">Ready</span>
+            </div>
+            <div class="opt-info-grid" id="opt-info-grid"></div>
+
+            <!-- Plots panel (used for all runs + curve graphs) -->
+            <div id="opt-panel-plots">
+                <div class="opt-plot-section-title" id="opt-plots-title">Optimisation Plots</div>
+                <div class="opt-plots-grid" id="opt-plots-grid"></div>
+                <div id="opt-no-plots" style="display:none;text-align:center;padding:40px 0;font-family:'Share Tech Mono',monospace;font-size:12px;color:rgba(251,191,36,0.3);letter-spacing:2px">NO PLOTS FOUND</div>
+            </div>
+
+            <!-- CSV data panel (curve only) -->
+            <div id="opt-panel-data" style="display:none">
+                <div class="opt-plot-section-title">Convergence Data Files (CSV)</div>
+                <table class="opt-file-table">
+                    <thead><tr><th>File</th><th>Rows</th><th>Size</th><th>Preview</th></tr></thead>
+                    <tbody id="opt-csv-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     LSTM MODAL
+════════════════════════════════════════════════════════ -->
+<div id="lstm-overlay" onclick="if(event.target===this)closeLstm()">
+<div id="lstm-modal">
+
+    <div id="lstm-header">
+        <div>
+            <div id="lstm-eyebrow">Temporal Deep Learning · Kp Forecasting</div>
+            <div id="lstm-title">LSTM Network Results</div>
+        </div>
+        <div id="lstm-header-right">
+            <span id="lstm-server-badge">○ Checking…</span>
+            <button id="lstm-close" onclick="closeLstm()">✕</button>
+        </div>
+    </div>
+
+    <!-- Variant selector: 10 / 30 / kp -->
+    <div id="lstm-variant-tabs">
+        <button class="lstm-vtab active" data-variant="10"  onclick="lstmSelectVariant('10',this)">10-Step</button>
+        <button class="lstm-vtab"        data-variant="30"  onclick="lstmSelectVariant('30',this)">30-Step</button>
+        <button class="lstm-vtab"        data-variant="kp"  onclick="lstmSelectVariant('kp',this)">Kp Direct</button>
+    </div>
+
+    <!-- Inner tabs: Graphs / Data & Models -->
+    <div id="lstm-inner-tabs">
+        <button class="lstm-itab active" data-itab="graphs" onclick="lstmSelectInner('graphs',this)">📊 Graphs</button>
+        <button class="lstm-itab"        data-itab="data"   onclick="lstmSelectInner('data',this)">📁 Data &amp; Models</button>
+    </div>
+
+    <div id="lstm-body">
+        <div id="lstm-loading" class="lstm-loading">Loading LSTM results…</div>
+        <div id="lstm-error"   class="lstm-error"   style="display:none"></div>
+
+        <!-- Status + info cards (shown when loaded) -->
+        <div id="lstm-content" style="display:none">
+            <div class="lstm-status-bar">
+                <div class="lstm-status-dot" id="lstm-dot"></div>
+                <span id="lstm-status-text">Ready</span>
+            </div>
+            <div class="lstm-info-grid" id="lstm-info-grid"></div>
+
+            <!-- GRAPHS panel -->
+            <div id="lstm-panel-graphs">
+                <div class="lstm-plot-section-title" id="lstm-graphs-title">Training &amp; Prediction Plots</div>
+                <div class="lstm-plots-grid" id="lstm-plots-grid"></div>
+                <div id="lstm-no-graphs" style="display:none;text-align:center;padding:40px 0;font-family:'Share Tech Mono',monospace;font-size:12px;color:rgba(52,211,153,0.3);letter-spacing:2px">NO GRAPHS FOUND</div>
+            </div>
+
+            <!-- DATA panel -->
+            <div id="lstm-panel-data" style="display:none">
+                <div class="lstm-plot-section-title">Data Files (CSV)</div>
+                <table class="lstm-file-table" id="lstm-csv-table">
+                    <thead><tr><th>File</th><th>Rows</th><th>Size</th><th>Preview</th></tr></thead>
+                    <tbody id="lstm-csv-tbody"></tbody>
+                </table>
+                <div class="lstm-plot-section-title" style="margin-top:10px">Model Files (.keras / .pkl)</div>
+                <table class="lstm-file-table" id="lstm-model-table">
+                    <thead><tr><th>File</th><th>Type</th><th>Size</th></tr></thead>
+                    <tbody id="lstm-model-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<script>
+/* ── Hero canvas ── */
+!function(){
+    const c=document.getElementById('ap-hero-canvas');
+    if(!c)return;
+    const rsz=()=>{c.width=c.offsetWidth;c.height=c.offsetHeight};rsz();window.addEventListener('resize',rsz);
+    const ctx=c.getContext('2d');let t=0;
+    const bands=[{y:.5,w:.2,col:[0,210,140],s:.28,p:0,a:.07},{y:.42,w:.13,col:[0,160,255],s:.46,p:1.5,a:.09},{y:.62,w:.11,col:[100,255,180],s:.38,p:2.8,a:.05},{y:.34,w:.08,col:[160,80,255],s:.62,p:.7,a:.07}];
+    const stars=Array.from({length:90},()=>({x:Math.random(),y:Math.random()*.82,r:Math.random()*1.2+.2,o:Math.random()*.45+.1}));
+    function frame(){const W=c.width,H=c.height;ctx.clearRect(0,0,W,H);const sk=ctx.createLinearGradient(0,0,0,H);sk.addColorStop(0,'#010c20');sk.addColorStop(.75,'#031830');sk.addColorStop(1,'#082448');ctx.fillStyle=sk;ctx.fillRect(0,0,W,H);stars.forEach(s=>{ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(255,255,255,${s.o*(.65+.35*Math.sin(t*.38+s.x*9))})`;ctx.fill();});bands.forEach(b=>{const cy=b.y+Math.sin(t*b.s+b.p)*b.a,it=.28+.22*Math.sin(t*b.s*1.4+b.p),[r,g,bl]=b.col,gd=ctx.createLinearGradient(0,(cy-b.w)*H,0,(cy+b.w)*H);gd.addColorStop(0,'transparent');gd.addColorStop(.25,`rgba(${r},${g},${bl},${it*.28})`);gd.addColorStop(.5,`rgba(${r},${g},${bl},${it})`);gd.addColorStop(.75,`rgba(${r},${g},${bl},${it*.28})`);gd.addColorStop(1,'transparent');ctx.beginPath();for(let x=0;x<=W;x+=5){const w=Math.sin(x*.006+t*b.s+b.p)*b.a*H*1.9+Math.sin(x*.011+t*b.s*.65)*b.a*H*.7,y=(cy+w/H)*H-b.w*H;x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}for(let x=W;x>=0;x-=5){const w=Math.sin(x*.006+t*b.s+b.p)*b.a*H*1.9+Math.sin(x*.011+t*b.s*.65)*b.a*H*.7,y=(cy+w/H)*H+b.w*H;ctx.lineTo(x,y);}ctx.closePath();ctx.fillStyle=gd;ctx.fill();});t+=.009;requestAnimationFrame(frame);}
+    frame();
+}();
+
+/* Card entrance */
+document.querySelectorAll('.ap-card').forEach((c,i)=>{c.style.cssText+=`;opacity:0;transform:translateY(20px);transition:opacity .5s ease ${i*.06}s,transform .5s ease ${i*.06}s`;setTimeout(()=>{c.style.opacity='1';c.style.transform='translateY(0)'},80+i*60);});
+
+/* Coming soon flash */
+function comingSoon(card){
+    const t=card.querySelector('.ap-card-title').textContent;
+    card.style.transform='scale(0.98)';setTimeout(()=>card.style.transform='',200);
+    const f=document.createElement('div');f.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#0a1628;color:#fff;padding:14px 28px;border-radius:10px;font-family:Share Tech Mono,monospace;font-size:12px;letter-spacing:2px;z-index:9999;pointer-events:none;opacity:0;transition:opacity .2s';
+    f.textContent=t.toUpperCase()+' — COMING SOON';document.body.appendChild(f);setTimeout(()=>f.style.opacity='1',10);setTimeout(()=>{f.style.opacity='0';setTimeout(()=>f.remove(),300)},1800);
+}
+
+
+/* ═══════════════════════════════════════════
+   SERVER CONFIG
+═══════════════════════════════════════════ */
+const SERVER = 'http://localhost:5000';
+
+async function checkServer(){
+    try{
+        const r = await fetch(`${SERVER}/health`, {signal: AbortSignal.timeout(2000)});
+        const d = await r.json();
+        setServerBadge(d.status === 'ok');
+    }catch(e){ setServerBadge(false); }
+}
+function setServerBadge(online){
+    const b = document.getElementById('server-badge');
+    if(!b) return;
+    b.textContent = online ? '● Server online' : '○ Server offline — run: python server.py';
+    b.style.color = online ? '#4cff88' : '#ff6060';
+    b.style.borderColor = online ? 'rgba(76,255,136,0.3)' : 'rgba(255,96,96,0.3)';
+    b.style.background = online ? 'rgba(76,255,136,0.06)' : 'rgba(255,96,96,0.06)';
+}
+checkServer();
+
+/* ═══════════════════════════════════════════
+   ALGORITHM REGISTRY
+═══════════════════════════════════════════ */
+const ALGOS = {
+    math: {
+        title: 'Math Models',
+        versions: [
+            {
+                key:'v13', label:'v1.3 — Solar Wind Model', tag:'STATIC',
+                fname:'aurora_v1_3.py',
+                endpoint: '/run/v13',
+                desc:'Runs on the local Python server. Adjusts aurora probability using solar wind speed and IMF Bz boost factors, then returns a full probability table and auroral boundary latitudes for Kp 0–9.',
+                params:[
+                    {id:'speed', label:'Solar Wind Speed (km/s)', val:650, min:200, max:1200, hint:'Typical: 300–800 km/s'},
+                    {id:'bz',    label:'IMF Bz (nT)',             val:-8,  min:-40, max:20,   hint:'Negative = southward (favourable)'},
+                ],
+                code:`<span class="py-cmt"># v1.3  solar wind effects on aurora predictor</span>
+<span class="py-kw">def</span> <span class="py-fn">aurora_probability</span>(kp):
+    <span class="py-kw">if</span>   kp < <span class="py-num">2</span>: <span class="py-kw">return</span> <span class="py-num">0.05</span>
+    <span class="py-kw">elif</span> kp < <span class="py-num">4</span>: <span class="py-kw">return</span> <span class="py-num">0.20</span>
+    <span class="py-kw">elif</span> kp < <span class="py-num">5</span>: <span class="py-kw">return</span> <span class="py-num">0.40</span>
+    <span class="py-kw">elif</span> kp < <span class="py-num">6</span>: <span class="py-kw">return</span> <span class="py-num">0.60</span>
+    <span class="py-kw">elif</span> kp < <span class="py-num">7</span>: <span class="py-kw">return</span> <span class="py-num">0.80</span>
+    <span class="py-kw">else</span>:        <span class="py-kw">return</span> <span class="py-num">0.95</span>
+
+<span class="py-kw">def</span> <span class="py-fn">aurora_latitude_boundary</span>(kp):
+    <span class="py-kw">return</span> <span class="py-num">66.5</span> - (kp * <span class="py-num">3</span>)
+
+<span class="py-kw">def</span> <span class="py-fn">solar_wind_boost</span>(speed, bz):
+    sf = <span class="py-num">0.9</span> <span class="py-kw">if</span> speed < <span class="py-num">400</span> <span class="py-kw">else</span> <span class="py-num">1.0</span> <span class="py-kw">if</span> speed < <span class="py-num">600</span> <span class="py-kw">else</span> <span class="py-num">1.2</span>
+    bf = <span class="py-num">0.7</span> <span class="py-kw">if</span> bz > <span class="py-num">0</span> <span class="py-kw">else</span> <span class="py-num">1.0</span> <span class="py-kw">if</span> bz > -<span class="py-num">5</span> <span class="py-kw">else</span> <span class="py-num">1.4</span>
+    <span class="py-kw">return</span> sf * bf`
+            },
+            {
+                key:'v2', label:'v2.0 — Live NOAA Fetch', tag:'LIVE DATA',
+                fname:'aurora_v2_noaa.py',
+                endpoint: '/run/v2',
+                desc:'The Python server fetches real-time data from four NOAA SWPC endpoints: Kp index, solar wind plasma, IMF magnetometer, and active alerts. Returns structured JSON which the page charts automatically.',
+                params:[],
+                code:`<span class="py-kw">import</span> requests
+<span class="py-kw">from</span> datetime <span class="py-kw">import</span> datetime
+
+KP_URL     = <span class="py-str">"https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json"</span>
+PLASMA_URL = <span class="py-str">"https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json"</span>
+MAG_URL    = <span class="py-str">"https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json"</span>
+ALERTS_URL = <span class="py-str">"https://services.swpc.noaa.gov/products/alerts.json"</span>
+
+<span class="py-kw">def</span> <span class="py-fn">fetch_kp</span>():
+    data = requests.get(KP_URL, timeout=<span class="py-num">10</span>).json()
+    <span class="py-kw">return</span> <span class="py-fn">float</span>(data[-<span class="py-num">1</span>][<span class="py-num">1</span>]), data[-<span class="py-num">1</span>][<span class="py-num">0</span>]
+
+<span class="py-kw">def</span> <span class="py-fn">fetch_solar_wind</span>():
+    data = requests.get(PLASMA_URL, timeout=<span class="py-num">10</span>).json()
+    <span class="py-kw">return</span> {<span class="py-str">"speed"</span>: <span class="py-fn">float</span>(data[-<span class="py-num">1</span>][<span class="py-num">2</span>]), <span class="py-str">"density"</span>: <span class="py-fn">float</span>(data[-<span class="py-num">1</span>][<span class="py-num">1</span>])}
+
+<span class="py-kw">def</span> <span class="py-fn">fetch_imf</span>():
+    data = requests.get(MAG_URL, timeout=<span class="py-num">10</span>).json()
+    <span class="py-kw">return</span> {<span class="py-str">"bz"</span>: <span class="py-fn">float</span>(data[-<span class="py-num">1</span>][<span class="py-num">3</span>]), <span class="py-str">"bt"</span>: <span class="py-fn">float</span>(data[-<span class="py-num">1</span>][<span class="py-num">1</span>])}
+
+<span class="py-kw">def</span> <span class="py-fn">fetch_alerts</span>():
+    <span class="py-kw">return</span> requests.get(ALERTS_URL, timeout=<span class="py-num">10</span>).json()`
+            }
+        ]
+    }
+    ,
+    timeloc: {
+        title: 'Time & Location System',
+        versions: [
+            {
+                key:'v3', label:'v3.0 — Time & Location Forecast', tag:'LIVE DATA',
+                fname:'aurora_time_location_v3.py',
+                endpoint: '/run/v3',
+                desc:'Geocodes your location via OpenStreetMap Nominatim, fetches live Kp index and solar wind from NOAA SWPC, then computes aurora probability for the next 8 hours (every 2 hours) using an auroral oval latitude model and a night-time visibility factor.',
+                params:[
+                    {id:'location', label:'Location (city or place name)', val:'London', min:null, max:null, hint:'e.g. Tromsø, Reykjavik, Fairbanks', type:'text'},
+                ],
+                code:`<span class="py-cmt"># v3.0  time & location aurora forecast</span>
+<span class="py-kw">def</span> <span class="py-fn">auroral_oval_latitude</span>(kp):
+    <span class="py-kw">return</span> <span class="py-num">67</span> - kp * <span class="py-num">2</span>
+
+<span class="py-kw">def</span> <span class="py-fn">night_factor</span>(local_hour):
+    <span class="py-kw">if</span> <span class="py-num">22</span> <= local_hour <span class="py-kw">or</span> local_hour <= <span class="py-num">4</span>: <span class="py-kw">return</span> <span class="py-num">1.0</span>
+    <span class="py-kw">if</span> <span class="py-num">20</span> <= local_hour <= <span class="py-num">22</span> <span class="py-kw">or</span> <span class="py-num">4</span> <= local_hour <= <span class="py-num">6</span>: <span class="py-kw">return</span> <span class="py-num">0.6</span>
+    <span class="py-kw">return</span> <span class="py-num">0.2</span>
+
+<span class="py-kw">def</span> <span class="py-fn">aurora_probability</span>(lat, kp, speed, bz, hour):
+    oval_lat = auroral_oval_latitude(kp)
+    lat_distance = <span class="py-fn">abs</span>(lat - oval_lat)
+    <span class="py-kw">if</span> lat_distance > <span class="py-num">15</span>:
+        base = <span class="py-num">0.05</span>
+    <span class="py-kw">else</span>:
+        base = <span class="py-fn">max</span>(<span class="py-num">0</span>, <span class="py-num">1</span> - lat_distance / <span class="py-num">15</span>)
+    <span class="py-kw">if</span> speed > <span class="py-num">600</span>: base += <span class="py-num">0.15</span>
+    <span class="py-kw">if</span> bz < -<span class="py-num">5</span>:   base += <span class="py-num">0.20</span>
+    <span class="py-kw">if</span> bz < -<span class="py-num">10</span>:  base += <span class="py-num">0.20</span>
+    base *= night_factor(hour)
+    <span class="py-kw">return</span> <span class="py-fn">min</span>(base, <span class="py-num">1.0</span>) * <span class="py-num">100</span>`
+            },
+            {
+                key:'v31', label:'v3.1 — ML Prediction', tag:'RANDOM FOREST',
+                fname:'aurora_ml_prediction_v31.py',
+                endpoint: '/run/v31',
+                desc:'Trains a Random Forest classifier on 500 synthetic solar-wind samples (speed, density, Bz, Bt), applies it to live NOAA data, and derives aurora formation probability, visibility score, expected colour composition (green/red/purple), and estimated latitude reach.',
+                params:[
+                    {id:'lat', label:'Latitude (°)', val:51.5, min:-90, max:90, hint:'Positive = North'},
+                    {id:'lon', label:'Longitude (°)', val:-0.1, min:-180, max:180, hint:'Negative = West'},
+                ],
+                code:`<span class="py-cmt"># v3.1  ML aurora prediction — Random Forest</span>
+<span class="py-kw">from</span> sklearn.ensemble <span class="py-kw">import</span> RandomForestClassifier
+<span class="py-kw">from</span> sklearn.preprocessing <span class="py-kw">import</span> StandardScaler
+
+<span class="py-cmt"># Simulate 500 training samples</span>
+<span class="py-kw">for</span> _ <span class="py-kw">in</span> <span class="py-fn">range</span>(<span class="py-num">500</span>):
+    kp = np.random.randint(<span class="py-num">0</span>, <span class="py-num">9</span>)
+    sample = {<span class="py-str">"speed"</span>: np.random.normal(<span class="py-num">450</span> + kp*<span class="py-num">30</span>, <span class="py-num">50</span>),
+              <span class="py-str">"bz"</span>: np.random.normal(-kp, <span class="py-num">2</span>), ...}
+
+<span class="py-cmt"># Train + predict on live NOAA data</span>
+model = RandomForestClassifier(n_estimators=<span class="py-num">200</span>, random_state=<span class="py-num">42</span>)
+model.fit(X_train_scaled, y_train)
+probs = model.predict_proba(X_live_scaled)[<span class="py-num">0</span>]
+
+<span class="py-cmt"># Derived physics</span>
+formation_pct = weak*<span class="py-num">0.30</span> + moderate*<span class="py-num">0.70</span> + strong*<span class="py-num">0.95</span>
+latitude_reach = <span class="py-fn">max</span>(<span class="py-num">45</span>, <span class="py-num">67</span> - kp_now*<span class="py-num">2</span>)`
+            }
+        ]
+    }
+};
+
+let curAlgo = null, curVerIdx = 0, charts = [];
+
+/* ── Modal ── */
+function openRunner(key){
+    curAlgo = key; curVerIdx = 0;
+    document.getElementById('runner-title').textContent = ALGOS[key].title;
+    renderTabs(); loadVer(0); resetOutput();
+    document.getElementById('runner-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    checkServer();
+}
+function closeRunner(){
+    document.getElementById('runner-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+/* ── Tabs ── */
+function renderTabs(){
+    const cont = document.getElementById('runner-tabs'); cont.innerHTML = '';
+    ALGOS[curAlgo].versions.forEach((v,i) => {
+        const b = document.createElement('button');
+        b.className = 'vtab' + (i === curVerIdx ? ' active' : '');
+        b.innerHTML = `${v.label} <span class="vtag-pill">${v.tag}</span>`;
+        b.onclick = () => { curVerIdx = i; renderTabs(); loadVer(i); resetOutput(); };
+        cont.appendChild(b);
+    });
+}
+function loadVer(i){
+    const v = ALGOS[curAlgo].versions[i];
+    document.getElementById('ver-desc').textContent = v.desc;
+    document.getElementById('code-fname').textContent = v.fname;
+    document.getElementById('code-pre').innerHTML = v.code;
+    document.getElementById('code-wrap').classList.remove('show');
+    document.querySelector('.code-btn').textContent = '⟨/⟩ View Source Code';
+    const pw = document.getElementById('params-wrap'); pw.innerHTML = '';
+    (v.params || []).forEach(p => {
+        const r = document.createElement('div'); r.className = 'param-row';
+        const inputType = p.type === 'text' ? 'text' : 'number';
+        const extraAttrs = p.type === 'text' ? `style="width:220px;"` : `min="${p.min}" max="${p.max}"`;
+        r.innerHTML = `<label class="param-label" for="p-${p.id}">${p.label}</label>
+            <input class="param-input" type="${inputType}" id="p-${p.id}" value="${p.val}" ${extraAttrs}>
+            <span class="param-hint">${p.hint}</span>`;
+        pw.appendChild(r);
+    });
+}
+function toggleCode(){
+    const w = document.getElementById('code-wrap');
+    const b = document.querySelector('.code-btn');
+    b.textContent = w.classList.toggle('show') ? '⟨/⟩ Hide Source Code' : '⟨/⟩ View Source Code';
+}
+
+/* ── Main dispatcher — sends params to Python server, renders response ── */
+async function dispatch(){
+    const ver = ALGOS[curAlgo].versions[curVerIdx];
+    const body = {};
+    (ver.params || []).forEach(p => {
+        const el = document.getElementById('p-' + p.id);
+        if(el) body[p.id] = p.type === 'text' ? el.value : parseFloat(el.value);
+    });
+
+    setRunning(true);
+    resetOutput();
+    showOutput();
+    setStatus('⟳ Running on server…', 's-run');
+    showTerminal(
+        `<span class="td">POST ${SERVER}${ver.endpoint}</span>\n` +
+        `<span class="td">Sending to Python server…</span>`
+    );
+
+    try {
+        const res = await fetch(`${SERVER}${ver.endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(20000),
+        });
+        if(!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
+        const data = await res.json();
+
+        if(ver.key === 'v13') renderV13(data);
+        if(ver.key === 'v2')  renderV2(data);
+        if(ver.key === 'v3')  renderV3(data);
+        if(ver.key === 'v31') renderV31(data);
+        setStatus('✓ Complete', 's-ok');
+
+    } catch(e) {
+        setStatus('✗ Cannot reach server', 's-err');
+        showTerminal(
+            `<span class="tr">✗ Could not connect to the Python server.</span>\n\n` +
+            `<span class="td">Start it with:</span>\n\n` +
+            `  <span class="ty">pip install flask flask-cors requests</span>\n` +
+            `  <span class="ty">python server.py</span>\n\n` +
+            `<span class="td">Then try again. Error: ${e.message}</span>`
+        );
+        setServerBadge(false);
+    }
+    setRunning(false);
+    document.getElementById('output-wrap').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+/* ── Render helpers ── */
+function renderV13(d){
+    const p = d.params, kps = d.kp_values;
+    showTerminal(
+        `<span class="tb">━━ Aurora v1.3  ·  ${d.ran_at} ━━</span>\n\n` +
+        `<span class="td">Parameters</span>\n` +
+        `  Solar wind  <span class="ty">${p.speed} km/s</span>  ${p.speed_label}\n` +
+        `  IMF Bz      <span class="ty">${p.bz} nT</span>   ${p.bz_label}\n` +
+        `  Boost       <span class="tg">× ${p.boost.toFixed(2)}</span>\n\n` +
+        `<span class="td">Kp │ Base   │ With solar wind</span>\n` +
+        `<span class="td">───┼────────┼────────────────</span>\n` +
+        kps.map(k =>
+            ` ${k}  │ ${String(d.base_probs[k]).padStart(5)}%  │ ${String(d.final_probs[k]).padStart(5)}%  ${'▓'.repeat(Math.round(d.final_probs[k]/10))}`
+        ).join('\n') +
+        `\n\n<span class="td">Auroral boundary</span>  Kp 0 → ${d.latitudes[0]}°  ·  Kp 5 → ${d.latitudes[5]}°  ·  Kp 9 → ${d.latitudes[9]}°` +
+        `\n\n<span class="tg">✔ Python computation complete</span>`
+    );
+    addChart('prob', 'Aurora Probability vs Kp Index', {
+        type:'line',
+        data:{ labels:kps, datasets:[
+            { label:'Kp only', data:d.base_probs, borderColor:'#9ca3af', backgroundColor:'rgba(156,163,175,0.08)', borderWidth:2, pointRadius:4, tension:.3 },
+            { label:`With solar wind (×${p.boost.toFixed(2)})`, data:d.final_probs, borderColor:'#0d7a3e', backgroundColor:'rgba(13,122,62,0.1)', borderWidth:2.5, pointRadius:4, tension:.3 }
+        ]},
+        options:{ ...baseOpts(), scales:{ x:{title:{display:true,text:'Kp Index'},ticks:{maxTicksLimit:10},grid:{color:'rgba(0,0,0,0.05)'}}, y:{title:{display:true,text:'Probability (%)'},min:0,max:105,grid:{color:'rgba(0,0,0,0.05)'}} } }
+    });
+    addChart('lat', 'Auroral Boundary Latitude vs Kp', {
+        type:'line',
+        data:{ labels:kps, datasets:[{ label:'Southern boundary (°lat)', data:d.latitudes, borderColor:'#1565c0', backgroundColor:'rgba(21,101,192,0.1)', borderWidth:2.5, pointRadius:4, fill:true, tension:.3 }]},
+        options:{ ...baseOpts(), scales:{ x:{title:{display:true,text:'Kp Index'},ticks:{maxTicksLimit:10},grid:{color:'rgba(0,0,0,0.05)'}}, y:{title:{display:true,text:'Latitude (°)'},min:25,max:70,grid:{color:'rgba(0,0,0,0.05)'}} } }
+    });
+}
+
+function renderV2(d){
+    const kp = d.kp, sw = d.solar_wind, imf = d.imf;
+    const kpC = kp.value >= 7 ? 'tr' : kp.value >= 5 ? 'ty' : 'tg';
+    const bzC = imf.bz < -5 ? 'tg' : imf.bz < 0 ? 'ty' : 'tr';
+    const errLine = d.errors && d.errors.length ? `\n<span class="ty">⚠ ${d.errors.join(' | ')}</span>` : '';
+    showTerminal(
+        `<span class="tb">━━ AURORA SPACE WEATHER  ${d.ran_at} ━━</span>${errLine}\n\n` +
+        `<span class="td">Geomagnetic</span>  Kp <span class="${kpC}">${kp.value?.toFixed(1)}  ${kp.label}</span>\n` +
+        `<span class="td">Solar Wind  </span>  ${sw.speed?.toFixed(0)} km/s   density ${sw.density?.toFixed(1)} p/cm³\n` +
+        `<span class="td">IMF Bz      </span>  <span class="${bzC}">${imf.bz?.toFixed(1)} nT</span>   ${imf.bz_label}\n` +
+        `<span class="td">IMF Bt      </span>  ${imf.bt?.toFixed(1)} nT\n\n` +
+        `<span class="td">Active Alerts</span>\n` +
+        (d.alerts.length ? d.alerts.map(a => `  <span class="ty">⚠</span> ${a.message}`).join('\n') : '  None') +
+        `\n\n<span class="tg">✔ Python fetch complete</span>`
+    );
+    const kpH = kp.history || [], swH = sw.history || [], bzH = imf.history || [];
+    addChart('kph', 'Kp Index — Last 24 readings', {
+        type:'bar',
+        data:{ labels:kpH.map(r=>r.time), datasets:[{ data:kpH.map(r=>r.value), backgroundColor:kpH.map(r=>r.value>=5?'#ef4444':r.value>=3?'#f59e0b':'#22c55e'), borderRadius:3 }]},
+        options:{ plugins:{legend:{display:false}}, scales:{ x:{ticks:{maxTicksLimit:8,font:{size:9}},grid:{color:'rgba(0,0,0,0.05)'}}, y:{min:0,max:9,title:{display:true,text:'Kp'},grid:{color:'rgba(0,0,0,0.05)'}} } }
+    });
+    addChart('wh', 'Solar Wind Speed (km/s)', {
+        type:'line',
+        data:{ labels:swH.map(r=>r.time), datasets:[{ data:swH.map(r=>r.value), borderColor:'#1565c0', backgroundColor:'rgba(21,101,192,0.08)', borderWidth:2, pointRadius:0, fill:true, tension:.4 }]},
+        options:{ plugins:{legend:{display:false}}, scales:{ x:{ticks:{maxTicksLimit:8,font:{size:9}},grid:{color:'rgba(0,0,0,0.05)'}}, y:{title:{display:true,text:'km/s'},grid:{color:'rgba(0,0,0,0.05)'}} } }
+    });
+    addChart('bzh', 'IMF Bz (nT)', {
+        type:'line',
+        data:{ labels:bzH.map(r=>r.time), datasets:[{ data:bzH.map(r=>r.value), borderColor:imf.bz<-5?'#22c55e':'#6b7280', backgroundColor:imf.bz<-5?'rgba(34,197,94,0.08)':'rgba(107,114,128,0.06)', borderWidth:2, pointRadius:0, fill:true, tension:.3 }]},
+        options:{ plugins:{legend:{display:false}}, scales:{ x:{ticks:{maxTicksLimit:8,font:{size:9}},grid:{color:'rgba(0,0,0,0.05)'}}, y:{title:{display:true,text:'nT'},grid:{color:'rgba(0,0,0,0.05)'}} } }
+    });
+}
+
+/* ── Output helpers ── */
+const baseOpts = () => ({ responsive:true, plugins:{ legend:{ display:true, position:'bottom', labels:{ font:{ family:'Space Grotesk', size:11 }, boxWidth:12 }}}});
+function setRunning(y){ const b=document.getElementById('run-btn'); b.disabled=y; b.classList.toggle('running',y); }
+function resetOutput(){ document.getElementById('output-wrap').classList.remove('show'); charts.forEach(c=>c.destroy()); charts=[]; document.getElementById('charts-grid').innerHTML=''; document.getElementById('terminal').innerHTML=''; if(window._v31map){ window._v31map.remove(); window._v31map=null; } }
+function showTerminal(h){ document.getElementById('terminal').innerHTML=h; }
+function setStatus(t,c){ const s=document.getElementById('out-status'); s.textContent=t; s.className='out-status '+c; }
+function showOutput(){ document.getElementById('output-wrap').classList.add('show'); }
+function addChart(id,title,config){ const g=document.getElementById('charts-grid'); const card=document.createElement('div'); card.className='chart-card'; card.innerHTML=`<div class="chart-card-title">${title}</div><canvas id="ch-${id}" height="190"></canvas>`; g.appendChild(card); charts.push(new Chart(document.getElementById('ch-'+id).getContext('2d'),config)); }
+
+function renderV3(d){
+    const loc = d.location, sw = d.space_weather, fc = d.forecast;
+    const errLine = d.errors && d.errors.length ? `\n<span class="ty">⚠ ${d.errors.join(' | ')}</span>` : '';
+    const kpC = sw.kp >= 7 ? 'tr' : sw.kp >= 5 ? 'ty' : 'tg';
+    const bzC = sw.bz < -5 ? 'tg' : sw.bz < 0 ? 'ty' : 'tr';
+    showTerminal(
+        `<span class="tb">━━ TIME & LOCATION FORECAST  ${d.ran_at} ━━</span>${errLine}\n\n` +
+        `<span class="td">Location    </span>  ${loc.display_name.split(',').slice(0,3).join(',')}\n` +
+        `<span class="td">Coordinates </span>  ${loc.lat}°N  ${loc.lon}°\n` +
+        `<span class="td">Auroral oval</span>  ${d.auroral_oval_lat}°  (${d.proximity})\n\n` +
+        `<span class="td">Kp Index    </span>  <span class="${kpC}">${sw.kp?.toFixed(1)}</span>\n` +
+        `<span class="td">Solar Wind  </span>  ${sw.speed?.toFixed(0)} km/s   density ${sw.density?.toFixed(1)} p/cm³\n` +
+        `<span class="td">IMF Bz      </span>  <span class="${bzC}">${sw.bz?.toFixed(1)} nT</span>   ${sw.bz_label}\n\n` +
+        `<span class="td">8-Hour Aurora Forecast (UTC)</span>\n` +
+        `<span class="td">────────────────────────────</span>\n` +
+        fc.map(f => {
+            const bar = '▓'.repeat(Math.round(f.probability / 10));
+            const pc  = f.probability >= 50 ? 'tg' : f.probability >= 20 ? 'ty' : 'td';
+            return `  ${f.time_utc}  <span class="${pc}">${String(f.probability).padStart(5)}%</span>  ${bar}`;
+        }).join('\n') +
+        `\n\n<span class="tg">✔ Python forecast complete</span>`
+    );
+    addChart('fcast', '8-Hour Aurora Probability Forecast', {
+        type: 'bar',
+        data: {
+            labels: fc.map(f => f.time_utc + ' UTC'),
+            datasets: [{
+                label: 'Aurora Probability (%)',
+                data: fc.map(f => f.probability),
+                backgroundColor: fc.map(f => f.probability >= 50 ? 'rgba(13,122,62,0.75)' : f.probability >= 20 ? 'rgba(227,179,65,0.75)' : 'rgba(107,114,128,0.5)'),
+                borderRadius: 6,
+            }]
+        },
+        options: { plugins:{legend:{display:false}}, scales:{ x:{ticks:{font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}}, y:{min:0,max:100,title:{display:true,text:'Probability (%)'},grid:{color:'rgba(0,0,0,0.05)'}} } }
+    });
+    addChart('nfact', 'Night Factor by Hour', {
+        type: 'line',
+        data: {
+            labels: fc.map(f => f.time_utc + ' UTC'),
+            datasets: [{
+                label: 'Night visibility factor',
+                data: fc.map(f => f.night_factor),
+                borderColor: '#1565c0',
+                backgroundColor: 'rgba(21,101,192,0.1)',
+                borderWidth: 2, pointRadius: 5, fill: true, tension: 0.3,
+            }]
+        },
+        options: { plugins:{legend:{display:false}}, scales:{ x:{ticks:{font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}}, y:{min:0,max:1.1,title:{display:true,text:'Factor (0–1)'},grid:{color:'rgba(0,0,0,0.05)'}} } }
+    });
+}
+
+function renderV31(d){
+    const sw = d.space_weather, cp = d.class_probs, col = d.colour_probs;
+    const errLine = d.errors && d.errors.length ? `\n<span class="ty">⚠ ${d.errors.join(' | ')}</span>` : '';
+    const kpC = sw.kp >= 7 ? 'tr' : sw.kp >= 5 ? 'ty' : 'tg';
+    const bzC = sw.bz < -5 ? 'tg' : sw.bz < 0 ? 'ty' : 'tr';
+    const fmtC = d.formation_pct >= 60 ? 'tg' : d.formation_pct >= 30 ? 'ty' : 'td';
+    showTerminal(
+        `<span class="tb">━━ ML AURORA PREDICTION  ${d.ran_at} ━━</span>${errLine}\n\n` +
+        `<span class="td">Location    </span>  ${d.location.lat}°N  ${d.location.lon}°\n` +
+        `<span class="td">Kp Index    </span>  <span class="${kpC}">${sw.kp?.toFixed(1)}</span>\n` +
+        `<span class="td">Solar Wind  </span>  ${sw.speed?.toFixed(0)} km/s   density ${sw.density?.toFixed(1)} p/cm³\n` +
+        `<span class="td">IMF Bz      </span>  <span class="${bzC}">${sw.bz?.toFixed(1)} nT</span>   ${sw.bz_label}\n\n` +
+        `<span class="td">Aurora Class Probabilities</span>\n` +
+        `  Weak      <span class="td">${String(cp.weak     ?? 0).padStart(6)}%</span>\n` +
+        `  Moderate  <span class="ty">${String(cp.moderate ?? 0).padStart(6)}%</span>\n` +
+        `  Strong    <span class="tg">${String(cp.strong   ?? 0).padStart(6)}%</span>\n\n` +
+        `<span class="td">Formation Probability </span>  <span class="${fmtC}">${d.formation_pct}%</span>\n` +
+        `<span class="td">Visibility Probability</span>  ${d.visibility_pct}%\n\n` +
+        `<span class="td">Expected Colour Composition</span>\n` +
+        `  <span class="tg">Green </span> ${col.green}%\n` +
+        `  <span class="tr">Red   </span> ${col.red}%\n` +
+        `  <span style="color:#a78bfa">Purple</span> ${col.purple}%\n\n` +
+        `<span class="td">Latitude Reach</span>  ~${d.latitude_reach}°\n` +
+        `<span class="td">Your Latitude </span>  ${d.location.lat}° — ${d.lat_visibility}\n\n` +
+        `<span class="tg">✔ Random Forest prediction complete</span>`
+    );
+    addChart('cls', 'Aurora Class Probabilities (RF)', {
+        type: 'bar',
+        data: {
+            labels: ['Weak', 'Moderate', 'Strong'],
+            datasets: [{
+                data: [cp.weak ?? 0, cp.moderate ?? 0, cp.strong ?? 0],
+                backgroundColor: ['rgba(107,114,128,0.7)', 'rgba(227,179,65,0.7)', 'rgba(13,122,62,0.75)'],
+                borderRadius: 6,
+            }]
+        },
+        options: { plugins:{legend:{display:false}}, scales:{ x:{grid:{color:'rgba(0,0,0,0.05)'}}, y:{min:0,max:100,title:{display:true,text:'Probability (%)'},grid:{color:'rgba(0,0,0,0.05)'}} } }
+    });
+    addChart('col', 'Expected Aurora Colour Composition', {
+        type: 'doughnut',
+        data: {
+            labels: ['Green', 'Red', 'Purple'],
+            datasets: [{
+                data: [col.green, col.red, col.purple],
+                backgroundColor: ['rgba(34,197,94,0.8)', 'rgba(239,68,68,0.8)', 'rgba(167,139,250,0.8)'],
+                borderWidth: 0,
+            }]
+        },
+        options: { plugins:{ legend:{ display:true, position:'bottom', labels:{ font:{family:'Space Grotesk',size:11}, boxWidth:12 }}}}
+    });
+
+    // ── Leaflet map ──
+    const g = document.getElementById('charts-grid');
+    const mapCard = document.createElement('div');
+    mapCard.className = 'map-card';
+    mapCard.innerHTML = `<div class="map-card-title">📍 Input Location &amp; Auroral Oval Boundary</div><div id="v31-map"></div>`;
+    g.appendChild(mapCard);
+
+    // Destroy any previous map instance on the same element
+    if(window._v31map) { window._v31map.remove(); window._v31map = null; }
+
+    setTimeout(() => {
+        const lat = d.location.lat, lon = d.location.lon;
+        const ovalLat = d.latitude_reach; // equatorward edge latitude
+
+        const map = L.map('v31-map', { zoomControl: true, scrollWheelZoom: false })
+            .setView([lat, lon], 4);
+        window._v31map = map;
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap © CARTO',
+            maxZoom: 19,
+        }).addTo(map);
+
+        // Marker for input coordinates
+        const pinIcon = L.divIcon({
+            className: '',
+            html: `<div style="width:14px;height:14px;background:#3fb950;border:2px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(63,185,80,0.7);"></div>`,
+            iconSize: [14, 14], iconAnchor: [7, 7],
+        });
+        L.marker([lat, lon], { icon: pinIcon })
+            .addTo(map)
+            .bindPopup(`<b>${lat.toFixed(3)}°N, ${lon.toFixed(3)}°</b><br>Aurora formation: ${d.formation_pct}%`)
+            .openPopup();
+
+        // Auroral oval boundary circle (approximate — full-longitude band at ovalLat)
+        // Draw as a lat-band circle centred on the north pole, radius = 90 - ovalLat degrees
+        const ovalRadiusKm = (90 - ovalLat) * 111.2; // rough km per degree
+        L.circle([90, 0], {
+            radius: ovalRadiusKm * 1000,
+            color: '#79c0ff',
+            weight: 1.5,
+            fillColor: '#79c0ff',
+            fillOpacity: 0.07,
+            dashArray: '5 5',
+        }).addTo(map).bindTooltip(`Auroral oval edge ~${ovalLat}°`, { permanent: false });
+
+    }, 80); // slight delay so DOM is ready
+}
+
+document.addEventListener('keydown', e => { if(e.key === 'Escape') { closeRunner(); closeCnn(); closeXgb(); closeLr(); closeLightbox(); closeLstm(); lstmCloseLb(); closeOpt(); optCloseLb(); } });
+window.openRunner=openRunner; window.closeRunner=closeRunner; window.dispatch=dispatch;
+window.toggleCode=toggleCode; window.comingSoon=comingSoon;
+
+/* ═══════════════════════════════════════════
+   CNN RUNNER
+═══════════════════════════════════════════ */
+
+let _cnnData = null;
+
+// Plot filename → tab bucket mapping
+const PLOT_BUCKETS = {
+    clustering_sil:  f => f.startsWith('01_'),
+    clustering_rep:  f => f.startsWith('02_'),
+    training:        f => f.startsWith('03_'),
+    comparison:      f => f.startsWith('04_'),
+    confusion:       f => f.startsWith('05_'),
+    gradcam:         f => f.startsWith('06_'),
+    embeddings:      f => f.startsWith('07_'),
+    'fc-curves':     f => f.startsWith('08_'),
+    'fc-trends':     f => f.startsWith('09_'),
+};
+
+// Human-readable labels for plot filenames
+function plotLabel(fname) {
+    const map = {
+        '01_kmeans_silhouette.png':              'K-Means Silhouette Sweep',
+        '02_kmeans_cluster_representatives.png': 'Cluster Representatives',
+        '03_training_curves_v1_baseline.png':    'V1 Baseline — Training Curves',
+        '03_training_curves_v2_regularised.png': 'V2 Regularised — Training Curves',
+        '03_training_curves_v3_resnet.png':      'V3 ResNet — Training Curves',
+        '03_training_curves_v4_efficientnet.png':'V4 EfficientNet — Training Curves',
+        '04_model_comparison_val_metrics.png':   'All-Model Validation Comparison',
+        '05_confusion_matrix.png':               'Confusion Matrix (Raw + Normalised)',
+        '06_gradcam.png':                        'Grad-CAM Explainability',
+        '07_embedding_space_pca.png':            'Embedding Space — PCA',
+        '07_embedding_space_umap.png':           'Embedding Space — UMAP',
+        '08_forecaster_training_curves_lstm.png':'LSTM Forecaster — Training Curves',
+        '08_forecaster_training_curves_transformer.png':'Transformer Forecaster — Training Curves',
+        '09_forecaster_probability_trends.png':  'Forecaster Probability Trends',
+    };
+    return map[fname] || fname.replace(/_/g,' ').replace('.png','');
+}
+
+function makePlotCard(fname) {
+    const url = `${SERVER}/cnn/image/${encodeURIComponent(fname)}`;
+    const label = plotLabel(fname);
+    const div = document.createElement('div');
+    div.className = 'cnn-plot-card';
+    div.title = 'Click to enlarge';
+    div.onclick = () => openLightbox(url, label);
+    div.innerHTML = `<img src="${url}" alt="${label}" loading="lazy" onerror="this.style.opacity='0.2';this.alt='Not yet generated'">
+                     <div class="cnn-plot-label">${label}</div>`;
+    return div;
+}
+
+function populatePlotGrid(gridId, plots, bucketKey) {
+    const el = document.getElementById('cnn-plots-' + gridId);
+    if (!el) return;
+    el.innerHTML = '';
+    const matches = plots.filter(PLOT_BUCKETS[bucketKey] || (() => false));
+    if (matches.length === 0) {
+        el.innerHTML = `<div style="color:rgba(0,200,255,0.3);font-family:'Share Tech Mono',monospace;font-size:11px;padding:20px 0;">No plots in this group yet — run the notebook to generate them.</div>`;
+        return;
+    }
+    matches.forEach(f => el.appendChild(makePlotCard(f)));
+}
+
+function renderCnnData(data) {
+    _cnnData = data;
+    document.getElementById('cnn-loading').style.display = 'none';
+
+    // Status bar
+    const dot = document.getElementById('cnn-dot');
+    const stText = document.getElementById('cnn-status-text');
+    if (!data.data_available) {
+        dot.className = 'cnn-status-dot err';
+        stText.textContent = `Data directory not found: ${data.data_root} — check Server.py CNN_DATA_ROOT path`;
+    } else {
+        dot.className = 'cnn-status-dot';
+        stText.textContent = `Data loaded from ${data.data_root}  ·  ${data.plots.length} plot(s)  ·  ${data.models.length} model file(s)`;
+    }
+
+    // Meta grid — key run parameters from summary
+    const metaGrid = document.getElementById('cnn-meta-grid');
+    metaGrid.innerHTML = '';
+    const KEYS = [
+        'Dataset location','Splits','Input','Pseudo-classes',
+        'Embedding dim','Sequence length','Forecaster type','Best CNN backbone',
+        'Plot directory','Output directory'
+    ];
+    const p = data.summary_parsed || {};
+    KEYS.forEach(k => {
+        if (p[k]) {
+            const card = document.createElement('div');
+            card.className = 'cnn-meta-card';
+            card.innerHTML = `<div class="cnn-meta-k">${k}</div><div class="cnn-meta-v">${p[k]}</div>`;
+            metaGrid.appendChild(card);
+        }
+    });
+    if (metaGrid.children.length === 0) {
+        metaGrid.innerHTML = `<div style="color:rgba(0,200,255,0.3);font-family:'Share Tech Mono',monospace;font-size:11px;">run_summary.txt not found — run the notebook first.</div>`;
+    }
+
+    // Classification results from summary
+    if (data.summary_raw) {
+        const lines = data.summary_raw.split('\n').filter(l => /loss=/.test(l));
+        if (lines.length) {
+            const resCard = document.createElement('div');
+            resCard.className = 'cnn-meta-card';
+            resCard.style.gridColumn = '1 / -1';
+            resCard.innerHTML = `<div class="cnn-meta-k">Classification Results — Test Set</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-size:11px;line-height:2;color:#c8deff;margin-top:6px;">
+                ${lines.map(l => {
+                    const star = l.includes('★') || l.includes('*');
+                    return `<div style="${star?'color:#4cff88;':''}">${l.replace(/★/,'★').trim()}</div>`;
+                }).join('')}</div>`;
+            metaGrid.appendChild(resCard);
+        }
+    }
+
+    // Models table
+    const tbody = document.getElementById('cnn-models-tbody');
+    tbody.innerHTML = '';
+    if (data.models.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="color:rgba(0,200,255,0.3);font-style:italic;">No model files found in aurora_models/</td></tr>`;
+    } else {
+        data.models.forEach(m => {
+            const ext = m.name.split('.').pop();
+            const badge = ext === 'keras'
+                ? `<span class="cnn-model-badge badge-keras">KERAS</span>`
+                : `<span class="cnn-model-badge badge-tflite">TFLITE</span>`;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${m.name}</td><td>${badge}</td><td>${m.size_kb} KB</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Show summary tab
+    document.getElementById('cnn-tab-summary').style.display = 'block';
+
+    // Populate all plot grids
+    const plots = data.plots || [];
+    populatePlotGrid('clustering-sil',  plots, 'clustering_sil');
+    populatePlotGrid('clustering-rep',  plots, 'clustering_rep');
+    populatePlotGrid('training',        plots, 'training');
+    populatePlotGrid('comparison',      plots, 'comparison');
+    populatePlotGrid('confusion',       plots, 'confusion');
+    populatePlotGrid('gradcam',         plots, 'gradcam');
+    populatePlotGrid('embeddings',      plots, 'embeddings');
+    populatePlotGrid('fc-curves',       plots, 'fc-curves');
+    populatePlotGrid('fc-trends',       plots, 'fc-trends');
+}
+
+async function loadCnnData() {
+    document.getElementById('cnn-loading').style.display = 'block';
+    document.getElementById('cnn-error').style.display = 'none';
+    // Hide all tabs
+    ['summary','clustering','training','evaluation','embeddings','forecaster'].forEach(t => {
+        const el = document.getElementById('cnn-tab-'+t);
+        if (el) el.style.display = 'none';
+    });
+    try {
+        const res = await fetch(`${SERVER}/cnn/summary`, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderCnnData(data);
+        // Update server badge
+        const b = document.getElementById('cnn-server-badge');
+        b.textContent = '● Server online';
+        b.style.color = '#4cff88';
+        b.style.borderColor = 'rgba(76,255,136,0.3)';
+        b.style.background = 'rgba(76,255,136,0.06)';
+    } catch(e) {
+        document.getElementById('cnn-loading').style.display = 'none';
+        const errEl = document.getElementById('cnn-error');
+        errEl.style.display = 'block';
+        errEl.innerHTML = `<b>⚠ Could not load CNN data</b><br><br>
+Make sure the Python server is running:<br>
+<code style="background:rgba(0,0,0,0.3);padding:2px 8px;border-radius:4px;">python server.py</code><br><br>
+Error: ${e.message}<br><br>
+Also confirm that <code>CNN_DATA_ROOT</code> in Server.py points to your <code>data-outputs</code> folder.`;
+        const b = document.getElementById('cnn-server-badge');
+        b.textContent = '○ Server offline';
+        b.style.color = '#ff6060';
+        b.style.borderColor = 'rgba(255,96,96,0.3)';
+        b.style.background = 'rgba(255,96,96,0.06)';
+    }
+}
+
+const CNN_TAB_PANELS = {
+    summary:    'cnn-tab-summary',
+    clustering: 'cnn-tab-clustering',
+    training:   'cnn-tab-training',
+    evaluation: 'cnn-tab-evaluation',
+    embeddings: 'cnn-tab-embeddings',
+    forecaster: 'cnn-tab-forecaster',
+};
+
+function showCnnTab(key, btn) {
+    document.querySelectorAll('.cnn-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    Object.values(CNN_TAB_PANELS).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    const target = document.getElementById(CNN_TAB_PANELS[key]);
+    if (target && _cnnData) target.style.display = 'block';
+}
+
+function openCnn() {
+    _cnnData = null;
+    document.getElementById('cnn-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    // Reset to summary tab
+    document.querySelectorAll('.cnn-tab').forEach((b,i) => b.classList.toggle('active', i===0));
+    loadCnnData();
+}
+function closeCnn() {
+    document.getElementById('cnn-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+/* Lightbox */
+function openLightbox(url, label) {
+    document.getElementById('cnn-lb-img').src = url;
+    document.getElementById('cnn-lb-label').textContent = label;
+    document.getElementById('cnn-lightbox').classList.add('open');
+}
+function closeLightbox() {
+    document.getElementById('cnn-lightbox').classList.remove('open');
+    document.getElementById('cnn-lb-img').src = '';
+}
+
+
+/* ═══════════════════════════════════════════
+   LINEAR REGRESSION RUNNER
+═══════════════════════════════════════════ */
+
+let _lrData = null;
+
+function lrImgUrl(filename) {
+    return `${SERVER}/lr/image/${encodeURIComponent(filename)}`;
+}
+
+function lrPlotLabel(fname) {
+    // Humanise filename: strip extension, replace _ / - with spaces, title-case
+    return fname.replace(/\.png$/i, '').replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function makeLrPlotCard(fname) {
+    const url   = lrImgUrl(fname);
+    const label = lrPlotLabel(fname);
+    const div   = document.createElement('div');
+    div.className = 'lr-plot-card';
+    div.title = 'Click to enlarge';
+    div.onclick = () => openLightbox(url, label);
+    div.innerHTML = `<img src="${url}" alt="${label}" loading="lazy"
+        onerror="this.style.opacity='0.15';this.alt='Not found'">
+        <div class="lr-plot-label">${label}</div>`;
+    return div;
+}
+
+function renderLrData(data) {
+    _lrData = data;
+    document.getElementById('lr-loading').style.display = 'none';
+
+    // Status bar
+    const dot    = document.getElementById('lr-dot');
+    const stText = document.getElementById('lr-status-text');
+    const badge  = document.getElementById('lr-server-badge');
+
+    if (!data.data_available) {
+        dot.className = 'lr-status-dot err';
+        stText.textContent = `Directory not found: ${data.data_root}`;
+        badge.textContent = '○ Data missing';
+        badge.style.color = '#ff6060';
+    } else {
+        dot.className = 'lr-status-dot';
+        stText.textContent = `${data.graphs.length} graph(s)  ·  ${data.data_files.length} data file(s)  ·  ${data.data_root}`;
+        badge.textContent = '● Server online';
+        badge.style.color = '#c89eff';
+        badge.style.borderColor = 'rgba(160,100,255,0.4)';
+        badge.style.background  = 'rgba(160,100,255,0.08)';
+    }
+
+    // Graphs tab
+    const grid = document.getElementById('lr-plots-grid');
+    grid.innerHTML = '';
+    if (data.graphs.length === 0) {
+        grid.innerHTML = `<div style="color:rgba(160,100,255,0.3);font-family:'Share Tech Mono',monospace;font-size:11px;padding:20px 0;">
+            No PNG graphs found in graphs/ folder.</div>`;
+    } else {
+        data.graphs.forEach(f => grid.appendChild(makeLrPlotCard(f)));
+    }
+    document.getElementById('lr-tab-graphs').style.display = 'block';
+
+    // Data files tab — load separately
+    loadLrDataFiles();
+}
+
+async function loadLrDataFiles() {
+    const container = document.getElementById('lr-data-content');
+    container.innerHTML = `<div style="color:rgba(160,100,255,0.4);font-family:'Share Tech Mono',monospace;font-size:11px;padding:16px 0;">Loading data files…</div>`;
+    try {
+        const res  = await fetch(`${SERVER}/lr/data`, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderLrDataFiles(data);
+    } catch(e) {
+        container.innerHTML = `<div class="lr-error">Could not load data files: ${e.message}</div>`;
+    }
+}
+
+function renderLrDataFiles(data) {
+    const container = document.getElementById('lr-data-content');
+    if (!data.files || data.files.length === 0) {
+        container.innerHTML = `<div style="color:rgba(160,100,255,0.3);font-family:'Share Tech Mono',monospace;font-size:11px;padding:20px 0;">
+            No CSV or PKL files found in data/ folder.</div>`;
+        return;
+    }
+    let html = `<table class="lr-file-table">
+        <thead><tr><th>File</th><th>Type</th><th>Size</th><th>Rows</th><th>Columns</th></tr></thead><tbody>`;
+
+    data.files.forEach((f, i) => {
+        const badge = f.ext === 'csv'
+            ? `<span class="lr-badge-csv">CSV</span>`
+            : `<span class="lr-badge-pkl">PKL</span>`;
+        const rowCount = f.rows != null ? f.rows.toLocaleString() : '—';
+        const colList  = f.columns ? f.columns.join(', ') : '—';
+        const colShort = f.columns && f.columns.length > 4
+            ? f.columns.slice(0,4).join(', ') + ` +${f.columns.length - 4} more`
+            : colList;
+        html += `<tr>
+            <td><b>${f.name}</b>${f.preview ? `<br><button class="lr-csv-expand" onclick="toggleLrPreview(${i})">⊞ Preview rows</button>` : ''}</td>
+            <td>${badge}</td>
+            <td>${f.size_kb} KB</td>
+            <td>${rowCount}</td>
+            <td title="${colList}">${colShort}</td>
+        </tr>`;
+
+        if (f.preview && f.preview.length > 0 && !f.preview[0].error) {
+            const cols = f.columns || Object.keys(f.preview[0]);
+            html += `<tr id="lr-preview-row-${i}" style="display:none;">
+                <td colspan="5">
+                    <div class="lr-preview-wrap">
+                        <table class="lr-preview-table">
+                            <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+                            <tbody>${f.preview.map(row =>
+                                `<tr>${cols.map(c => `<td>${row[c] ?? ''}</td>`).join('')}</tr>`
+                            ).join('')}</tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>`;
+        }
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function toggleLrPreview(idx) {
+    const row = document.getElementById(`lr-preview-row-${idx}`);
+    if (!row) return;
+    const visible = row.style.display !== 'none';
+    row.style.display = visible ? 'none' : 'table-row';
+    const btn = document.querySelector(`[onclick="toggleLrPreview(${idx})"]`);
+    if (btn) btn.textContent = visible ? '⊞ Preview rows' : '⊟ Hide preview';
+}
+
+async function loadLrSummary() {
+    document.getElementById('lr-loading').style.display = 'block';
+    document.getElementById('lr-error').style.display   = 'none';
+    ['graphs','data'].forEach(t => {
+        const el = document.getElementById('lr-tab-' + t);
+        if (el) el.style.display = 'none';
+    });
+    try {
+        const res  = await fetch(`${SERVER}/lr/summary`, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderLrData(data);
+    } catch(e) {
+        document.getElementById('lr-loading').style.display = 'none';
+        const errEl = document.getElementById('lr-error');
+        errEl.style.display = 'block';
+        errEl.innerHTML = `<b>⚠ Could not load Linear Regression data</b><br><br>
+Make sure the Python server is running:<br>
+<code style="background:rgba(0,0,0,0.3);padding:2px 8px;border-radius:4px;">python server.py</code><br><br>
+Error: ${e.message}<br><br>
+Also confirm <code>LR_ROOT</code> in Server.py points to your <code>Linear Regression</code> folder.`;
+        const badge = document.getElementById('lr-server-badge');
+        badge.textContent = '○ Server offline';
+        badge.style.color  = '#ff6060';
+        badge.style.borderColor = 'rgba(255,96,96,0.3)';
+        badge.style.background  = 'rgba(255,96,96,0.06)';
+    }
+}
+
+function showLrTab(key, btn) {
+    document.querySelectorAll('.lr-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    ['graphs','data'].forEach(t => {
+        const el = document.getElementById('lr-tab-' + t);
+        if (el) el.style.display = 'none';
+    });
+    const target = document.getElementById('lr-tab-' + key);
+    if (target && _lrData) target.style.display = 'block';
+}
+
+function openLr() {
+    _lrData = null;
+    document.getElementById('lr-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    document.querySelectorAll('.lr-tab').forEach((b,i) => b.classList.toggle('active', i===0));
+    loadLrSummary();
+}
+function closeLr() {
+    document.getElementById('lr-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+
+/* ═══════════════════════════════════════════
+   XGBOOST & RANDOM FOREST RUNNER
+═══════════════════════════════════════════ */
+
+let _xgbData    = null;   // full response from /xgb/summary
+let _xgbRun     = '1';    // active run
+let _xgbSection = 'report'; // active section tab
+let _xgbDataLoaded = {};  // cache of CSV data per run: { '1': [...], '2': [...] }
+
+function xgbImgUrl(run, filename) {
+    return `${SERVER}/xgb/image/${run}/${encodeURIComponent(filename)}`;
+}
+
+function xgbPlotLabel(fname) {
+    return fname.replace(/\.png$/i,'').replace(/[_\-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+/* ── Render helpers ── */
+function renderXgbRun(run) {
+    if (!_xgbData) return;
+    const rd = _xgbData.runs[run];
+    if (!rd || !rd.available) {
+        ['report','plots','data','models'].forEach(s => {
+            const el = document.getElementById('xgb-tab-'+s);
+            if (el) el.style.display = 'none';
+        });
+        document.getElementById('xgb-tab-report').style.display = 'block';
+        document.getElementById('xgb-report-text').textContent = `Run ${run} directory not found.`;
+        return;
+    }
+
+    // Status bar
+    document.getElementById('xgb-dot').className = 'xgb-status-dot';
+    document.getElementById('xgb-status-text').textContent =
+        `Run ${run}  ·  ${rd.plots.length} plot(s)  ·  ${rd.data_files.length} CSV(s)  ·  ${rd.model_files.length} model(s)`;
+
+    // Report
+    document.getElementById('xgb-report-text').textContent =
+        rd.report || '(No .txt report file found in reports/ folder)';
+
+    // Plots
+    const grid = document.getElementById('xgb-plots-grid');
+    grid.innerHTML = '';
+    if (rd.plots.length === 0) {
+        grid.innerHTML = `<div style="color:rgba(255,160,40,0.3);font-family:'Share Tech Mono',monospace;font-size:11px;padding:20px 0;">No PNG plots found.</div>`;
+    } else {
+        rd.plots.forEach(fname => {
+            const url   = xgbImgUrl(run, fname);
+            const label = xgbPlotLabel(fname);
+            const card  = document.createElement('div');
+            card.className = 'xgb-plot-card';
+            card.onclick = () => openLightbox(url, `Run ${run} — ${label}`);
+            card.innerHTML = `<img src="${url}" alt="${label}" loading="lazy"
+                onerror="this.style.opacity='0.15'">
+                <div class="xgb-plot-label">${label}</div>`;
+            grid.appendChild(card);
+        });
+    }
+
+    // Models table
+    const tbody = document.getElementById('xgb-models-tbody');
+    tbody.innerHTML = '';
+    if (rd.model_files.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="color:rgba(255,160,40,0.3);font-style:italic;">No PKL model files found.</td></tr>`;
+    } else {
+        rd.model_files.forEach(m => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${m.name}</td><td><span class="xgb-badge-pkl">PKL</span></td><td>${m.size_kb} KB</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Show current section
+    showXgbSection(_xgbSection);
+
+    // Lazy-load CSV data for this run
+    loadXgbCsvData(run);
+}
+
+async function loadXgbCsvData(run) {
+    if (_xgbDataLoaded[run]) {
+        renderXgbCsvData(run, _xgbDataLoaded[run]);
+        return;
+    }
+    const container = document.getElementById('xgb-data-content');
+    container.innerHTML = `<div style="color:rgba(255,160,40,0.4);font-family:'Share Tech Mono',monospace;font-size:11px;padding:16px 0;">Loading CSV data…</div>`;
+    try {
+        const res  = await fetch(`${SERVER}/xgb/data/${run}`, { signal: AbortSignal.timeout(10000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        _xgbDataLoaded[run] = data.files || [];
+        renderXgbCsvData(run, _xgbDataLoaded[run]);
+    } catch(e) {
+        container.innerHTML = `<div class="xgb-error">Could not load CSV data: ${e.message}</div>`;
+    }
+}
+
+function renderXgbCsvData(run, files) {
+    const container = document.getElementById('xgb-data-content');
+    if (!files || files.length === 0) {
+        container.innerHTML = `<div style="color:rgba(255,160,40,0.3);font-family:'Share Tech Mono',monospace;font-size:11px;padding:20px 0;">No CSV files found in data/ folder.</div>`;
+        return;
+    }
+    let html = `<table class="xgb-file-table">
+        <thead><tr><th>File</th><th>Type</th><th>Size</th><th>Rows</th><th>Columns</th></tr></thead><tbody>`;
+
+    files.forEach((f, i) => {
+        const rowKey  = `xgb-prev-${run}-${i}`;
+        const rowCount = f.rows != null ? f.rows.toLocaleString() : '—';
+        const colList  = f.columns ? f.columns.join(', ') : '—';
+        const colShort = f.columns && f.columns.length > 4
+            ? f.columns.slice(0,4).join(', ') + ` +${f.columns.length-4} more`
+            : colList;
+        const badge = f.ext === 'csv'
+            ? `<span class="xgb-badge-csv">CSV</span>`
+            : `<span class="xgb-badge-pkl">PKL</span>`;
+        const hasPreview = f.preview && f.preview.length > 0 && !f.preview[0]?.error;
+
+        html += `<tr>
+            <td><b>${f.name}</b>${hasPreview ? `<br><button class="xgb-csv-expand" onclick="toggleXgbPreview('${rowKey}',this)">⊞ Preview rows</button>` : ''}</td>
+            <td>${badge}</td><td>${f.size_kb} KB</td>
+            <td>${rowCount}</td>
+            <td title="${colList}">${colShort}</td>
+        </tr>`;
+
+        if (hasPreview) {
+            const cols = f.columns || Object.keys(f.preview[0]);
+            html += `<tr id="${rowKey}" style="display:none;">
+                <td colspan="5">
+                    <div class="xgb-preview-wrap">
+                        <table class="xgb-preview-table">
+                            <thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+                            <tbody>${f.preview.map(row =>
+                                `<tr>${cols.map(c=>`<td>${row[c]??''}</td>`).join('')}</tr>`
+                            ).join('')}</tbody>
+                        </table>
+                    </div>
+                </td>
+            </tr>`;
+        }
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function toggleXgbPreview(rowId, btn) {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    const vis = row.style.display !== 'none';
+    row.style.display = vis ? 'none' : 'table-row';
+    btn.textContent = vis ? '⊞ Preview rows' : '⊟ Hide preview';
+}
+
+function showXgbSection(key) {
+    _xgbSection = key;
+    ['report','plots','data','models'].forEach(s => {
+        const el = document.getElementById('xgb-tab-'+s);
+        if (el) el.style.display = 'none';
+    });
+    const target = document.getElementById('xgb-tab-'+key);
+    if (target) target.style.display = 'block';
+}
+
+function showXgbTab(key, btn) {
+    document.querySelectorAll('.xgb-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    showXgbSection(key);
+}
+
+function selectXgbRun(run, btn) {
+    _xgbRun = run;
+    document.querySelectorAll('.xgb-run-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderXgbRun(run);
+}
+
+async function loadXgbSummary() {
+    document.getElementById('xgb-loading').style.display = 'block';
+    document.getElementById('xgb-error').style.display   = 'none';
+    ['report','plots','data','models'].forEach(s => {
+        const el = document.getElementById('xgb-tab-'+s);
+        if (el) el.style.display = 'none';
+    });
+    try {
+        const res  = await fetch(`${SERVER}/xgb/summary`, { signal: AbortSignal.timeout(10000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        _xgbData = data;
+        document.getElementById('xgb-loading').style.display = 'none';
+
+        const badge = document.getElementById('xgb-server-badge');
+        if (!data.data_available) {
+            badge.textContent = '○ Data missing';
+            badge.style.color = '#ff6060';
+            document.getElementById('xgb-dot').className = 'xgb-status-dot err';
+            document.getElementById('xgb-status-text').textContent =
+                `Directory not found: ${data.data_root}`;
+            document.getElementById('xgb-tab-report').style.display = 'block';
+            document.getElementById('xgb-report-text').textContent =
+                `Data directory not found:\n${data.data_root}\n\nCheck LR_ROOT in Server.py.`;
+        } else {
+            badge.textContent = '● Server online';
+            badge.style.color = '#ffaa44';
+            badge.style.borderColor = 'rgba(255,160,40,0.4)';
+            badge.style.background  = 'rgba(255,160,40,0.08)';
+            renderXgbRun(_xgbRun);
+        }
+    } catch(e) {
+        document.getElementById('xgb-loading').style.display = 'none';
+        const errEl = document.getElementById('xgb-error');
+        errEl.style.display = 'block';
+        errEl.innerHTML = `<b>⚠ Could not load XGBoost & RF data</b><br><br>
+Make sure the Python server is running:<br>
+<code style="background:rgba(0,0,0,0.3);padding:2px 8px;border-radius:4px;">python server.py</code><br><br>
+Error: ${e.message}<br><br>
+Confirm <code>XGB_ROOT</code> in Server.py points to your <code>XGBoost &amp; Random Forest</code> folder.`;
+        const badge = document.getElementById('xgb-server-badge');
+        badge.textContent = '○ Server offline';
+        badge.style.color  = '#ff6060';
+    }
+}
+
+function openXgb() {
+    _xgbData = null; _xgbRun = '1'; _xgbSection = 'report'; _xgbDataLoaded = {};
+    document.getElementById('xgb-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    // Reset run tabs and section tabs
+    document.querySelectorAll('.xgb-run-tab').forEach((b,i) => b.classList.toggle('active', i===0));
+    document.querySelectorAll('.xgb-tab').forEach((b,i) => b.classList.toggle('active', i===0));
+    loadXgbSummary();
+}
+function closeXgb() {
+    document.getElementById('xgb-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+window.openXgb = openXgb; window.closeXgb = closeXgb;
+window.showXgbTab = showXgbTab; window.selectXgbRun = selectXgbRun;
+window.toggleXgbPreview = toggleXgbPreview;
+window.openLr = openLr; window.closeLr = closeLr;
+window.showLrTab = showLrTab; window.toggleLrPreview = toggleLrPreview;
+window.openCnn = openCnn; window.closeCnn = closeCnn;
+window.showCnnTab = showCnnTab; window.closeLightbox = closeLightbox;
+
+/* ═══════════════════════════════════════════
+   OPTIMISATION MODAL
+═══════════════════════════════════════════ */
+
+const OPT_RUNS   = ['9.1', '9.2', '9.3', '9.4'];
+const OPT_SERVER = SERVER;
+let optCurrentRun        = '9.1';
+let optCurveInner        = 'graphs';
+let optCache             = {};  // run → { graphs, csv_files }
+
+function openOpt() {
+    document.getElementById('opt-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    optCheckServer();
+    optLoad('9.2');
+}
+
+function closeOpt() {
+    document.getElementById('opt-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+async function optCheckServer() {
+    const badge = document.getElementById('opt-server-badge');
+    try {
+        const r = await fetch(`${OPT_SERVER}/health`, { signal: AbortSignal.timeout(2500) });
+        const d = await r.json();
+        const ok = d.status === 'ok';
+        badge.textContent = ok ? '● Server online' : '○ Server offline';
+        badge.style.color       = ok ? '#fbbf24' : '#ff6060';
+        badge.style.borderColor = ok ? 'rgba(251,191,36,0.35)' : 'rgba(255,96,96,0.3)';
+        badge.style.background  = ok ? 'rgba(251,191,36,0.07)' : 'rgba(255,96,96,0.06)';
+    } catch(e) {
+        badge.textContent = '○ Server offline — run: python server.py';
+        badge.style.color       = '#ff6060';
+        badge.style.borderColor = 'rgba(255,96,96,0.3)';
+        badge.style.background  = 'rgba(255,96,96,0.06)';
+    }
+}
+
+function optSelectRun(run, btn) {
+    optCurrentRun = run;
+    document.querySelectorAll('.opt-rtab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    // Show/hide curve inner tabs
+    const curveInner = document.getElementById('opt-curve-inner-tabs');
+    if (run === 'curve') {
+        curveInner.classList.add('visible');
+    } else {
+        curveInner.classList.remove('visible');
+        // Reset curve inner to graphs when leaving curve
+        document.querySelectorAll('.opt-citab').forEach(b => b.classList.remove('active'));
+        document.querySelector('.opt-citab[data-itab="graphs"]').classList.add('active');
+        optCurveInner = 'graphs';
+    }
+    optLoad(run);
+}
+
+function optSelectCurveInner(inner, btn) {
+    optCurveInner = inner;
+    document.querySelectorAll('.opt-citab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    optRender('curve', optCache['curve']);
+}
+
+async function optLoad(run) {
+    document.getElementById('opt-loading').style.display = 'block';
+    document.getElementById('opt-error').style.display   = 'none';
+    document.getElementById('opt-content').style.display = 'none';
+
+    if (optCache[run]) {
+        optRender(run, optCache[run]);
+        return;
+    }
+
+    try {
+        const res = await fetch(`${OPT_SERVER}/opt/summary/${encodeURIComponent(run)}`,
+            { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        optCache[run] = data;
+        optRender(run, data);
+    } catch(e) {
+        document.getElementById('opt-loading').style.display = 'none';
+        const errEl = document.getElementById('opt-error');
+        errEl.style.display = 'block';
+        errEl.innerHTML = `<b>⚠ Could not load optimisation data for run "${run}"</b><br><br>
+Make sure the Python server is running:<br>
+<code style="background:rgba(0,0,0,0.3);padding:2px 8px;border-radius:4px;">python server.py</code><br><br>
+Expected data at: <code>optimal\\${run}\\</code><br>
+Error: ${e.message}`;
+    }
+}
+
+function optRender(run, data) {
+    document.getElementById('opt-loading').style.display = 'none';
+    document.getElementById('opt-error').style.display   = 'none';
+    document.getElementById('opt-content').style.display = 'block';
+
+    // Status
+    const dot  = document.getElementById('opt-dot');
+    const stxt = document.getElementById('opt-status-text');
+    if (data.available) {
+        dot.className = 'opt-status-dot';
+        const csvCount = (data.csv_files || []).length;
+        stxt.textContent = run === 'curve'
+            ? `Convergence curves — ${data.graphs.length} plots · ${csvCount} CSV`
+            : `Run ${run} — ${data.graphs.length} plots`;
+    } else {
+        dot.className = 'opt-status-dot warn';
+        stxt.textContent = `Run "${run}" folder not found on server`;
+    }
+
+    // Info cards
+    const isCurve = run === 'curve';
+    const grid = document.getElementById('opt-info-grid');
+    grid.innerHTML = [
+        { k: 'Run',      v: run === 'curve' ? 'Convergence Curve' : `Experiment ${run}` },
+        { k: 'Plots',    v: (data.graphs || []).length },
+        ...(isCurve ? [{ k: 'CSV Files', v: (data.csv_files || []).length }] : []),
+        { k: 'Path',     v: data.path || '—' },
+    ].map(c => `
+        <div class="opt-info-card">
+            <div class="opt-info-k">${c.k}</div>
+            <div class="opt-info-v">${c.v}</div>
+        </div>`).join('');
+
+    // For curve: switch between graphs / data panels
+    const showData = isCurve && optCurveInner === 'data';
+    document.getElementById('opt-panel-plots').style.display = showData ? 'none' : 'block';
+    document.getElementById('opt-panel-data').style.display  = showData ? 'block' : 'none';
+
+    if (!showData) {
+        optRenderPlots(run, data);
+    } else {
+        optRenderCsvData(data);
+    }
+}
+
+function optRenderPlots(run, data) {
+    const grid    = document.getElementById('opt-plots-grid');
+    const noPlots = document.getElementById('opt-no-plots');
+    const titleEl = document.getElementById('opt-plots-title');
+    titleEl.childNodes[0].textContent = run === 'curve'
+        ? 'Convergence Curve Plots'
+        : `Run ${run} — Optimisation Plots`;
+
+    const graphs = data.graphs || [];
+    if (!graphs.length) {
+        grid.innerHTML = '';
+        noPlots.style.display = 'block';
+        return;
+    }
+    noPlots.style.display = 'none';
+    grid.innerHTML = graphs.map(fname => {
+        const label = fname.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+        return `
+        <div class="opt-plot-card" onclick="optOpenLightbox('${run}','${fname}')">
+            <img src="${OPT_SERVER}/opt/image/${encodeURIComponent(run)}/${encodeURIComponent(fname)}"
+                 alt="${label}"
+                 loading="lazy"
+                 onerror="this.style.display='none';this.nextSibling.style.display='flex'"
+                 onload="this.style.opacity=1">
+            <div style="display:none;align-items:center;justify-content:center;padding:30px;font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(251,191,36,0.35)">Image unavailable</div>
+            <div class="opt-plot-label">${label}</div>
+        </div>`;
+    }).join('');
+}
+
+function optRenderCsvData(data) {
+    const tbody = document.getElementById('opt-csv-tbody');
+    const files = data.csv_files || [];
+    if (!files.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:rgba(167,243,208,0.3);padding:20px;font-family:\'Share Tech Mono\',monospace;font-size:11px">No CSV files found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = files.map((f, idx) => `
+        <tr>
+            <td><span class="opt-badge-csv">CSV</span> ${f.name}</td>
+            <td>${f.rows != null ? f.rows.toLocaleString() : '—'}</td>
+            <td>${f.size_kb} KB</td>
+            <td>${f.preview ? `<button class="opt-csv-expand" onclick="optTogglePreview(${idx})">⊞ Preview rows</button>` : '—'}</td>
+        </tr>
+        <tr id="opt-csv-preview-${idx}" style="display:none">
+            <td colspan="4">
+                ${f.preview ? optBuildCsvPreview(f.columns, f.preview) : ''}
+            </td>
+        </tr>`).join('');
+}
+
+function optBuildCsvPreview(cols, rows) {
+    if (!cols || !rows) return '';
+    return `<div class="opt-preview-wrap">
+        <table class="opt-preview-table">
+            <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${r[c] ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table>
+    </div>`;
+}
+
+function optTogglePreview(idx) {
+    const row = document.getElementById(`opt-csv-preview-${idx}`);
+    if (!row) return;
+    const vis = row.style.display !== 'none';
+    row.style.display = vis ? 'none' : 'table-row';
+    const btn = document.querySelector(`[onclick="optTogglePreview(${idx})"]`);
+    if (btn) btn.textContent = vis ? '⊞ Preview rows' : '⊟ Hide preview';
+}
+
+// Lightbox
+let optLbRun = '', optLbFiles = [], optLbIdx = 0;
+function optOpenLightbox(run, fname) {
+    optLbRun   = run;
+    optLbFiles = optCache[run]?.graphs || [];
+    optLbIdx   = optLbFiles.indexOf(fname);
+    optShowLb();
+}
+function optShowLb() {
+    const fname = optLbFiles[optLbIdx];
+    if (!fname) return;
+    let lb = document.getElementById('opt-lightbox');
+    if (!lb) {
+        lb = document.createElement('div');
+        lb.id = 'opt-lightbox';
+        lb.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.96);backdrop-filter:blur(12px);align-items:center;justify-content:center;flex-direction:column;gap:16px;';
+        lb.innerHTML = `
+            <button onclick="optCloseLb()" style="position:absolute;top:24px;right:32px;font-size:28px;cursor:pointer;color:rgba(255,255,255,0.4);background:none;border:none;line-height:1;transition:color .15s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">✕</button>
+            <button onclick="optLbNav(-1)" style="position:absolute;left:24px;top:50%;transform:translateY(-50%);font-size:32px;cursor:pointer;color:rgba(255,255,255,0.4);background:none;border:none;line-height:1;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">‹</button>
+            <img id="opt-lb-img" style="max-width:90vw;max-height:82vh;border-radius:4px;object-fit:contain">
+            <div id="opt-lb-cap" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;text-align:center"></div>
+            <button onclick="optLbNav(1)"  style="position:absolute;right:24px;top:50%;transform:translateY(-50%);font-size:32px;cursor:pointer;color:rgba(255,255,255,0.4);background:none;border:none;line-height:1;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">›</button>`;
+        document.body.appendChild(lb);
+    }
+    lb.style.display = 'flex';
+    document.getElementById('opt-lb-img').src = `${OPT_SERVER}/opt/image/${encodeURIComponent(optLbRun)}/${encodeURIComponent(fname)}`;
+    document.getElementById('opt-lb-cap').textContent = `${fname.replace(/\.[^.]+$/,'')} — ${optLbIdx+1} / ${optLbFiles.length}`;
+}
+function optCloseLb() { const lb = document.getElementById('opt-lightbox'); if(lb) lb.style.display='none'; }
+function optLbNav(dir) { optLbIdx = (optLbIdx + dir + optLbFiles.length) % optLbFiles.length; optShowLb(); }
+
+window.openOpt  = openOpt;
+window.closeOpt = closeOpt;
+window.optSelectRun        = optSelectRun;
+window.optSelectCurveInner = optSelectCurveInner;
+window.optTogglePreview    = optTogglePreview;
+window.optOpenLightbox     = optOpenLightbox;
+window.optCloseLb          = optCloseLb;
+window.optLbNav            = optLbNav;
+
+/* ═══════════════════════════════════════════
+   LSTM MODAL
+═══════════════════════════════════════════ */
+
+let lstmCurrentVariant = '10';
+let lstmCurrentInner   = 'graphs';
+let lstmCache          = {};   // variant → {graphs, data_files, model_files, ...}
+
+const LSTM_VARIANT_LABELS = {
+    '10': '10-Step Ahead Forecast',
+    '30': '30-Step Ahead Forecast',
+    'kp': 'Direct Kp Prediction',
+};
+
+function openLstm() {
+    document.getElementById('lstm-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    lstmCheckServer();
+    lstmLoad(lstmCurrentVariant);
+}
+
+function closeLstm() {
+    document.getElementById('lstm-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+async function lstmCheckServer() {
+    const badge = document.getElementById('lstm-server-badge');
+    try {
+        const r = await fetch(`${SERVER}/health`, { signal: AbortSignal.timeout(2500) });
+        const d = await r.json();
+        const ok = d.status === 'ok';
+        badge.textContent = ok ? '● Server online' : '○ Server offline';
+        badge.style.color       = ok ? '#34d399' : '#ff6060';
+        badge.style.borderColor = ok ? 'rgba(52,211,153,0.35)' : 'rgba(255,96,96,0.3)';
+        badge.style.background  = ok ? 'rgba(52,211,153,0.07)' : 'rgba(255,96,96,0.06)';
+    } catch(e) {
+        badge.textContent = '○ Server offline — run: python server.py';
+        badge.style.color       = '#ff6060';
+        badge.style.borderColor = 'rgba(255,96,96,0.3)';
+        badge.style.background  = 'rgba(255,96,96,0.06)';
+    }
+}
+
+function lstmSelectVariant(variant, btn) {
+    lstmCurrentVariant = variant;
+    document.querySelectorAll('.lstm-vtab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    lstmLoad(variant);
+}
+
+function lstmSelectInner(inner, btn) {
+    lstmCurrentInner = inner;
+    document.querySelectorAll('.lstm-itab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    lstmRenderInner(lstmCurrentVariant);
+}
+
+async function lstmLoad(variant) {
+    // Show loading state
+    document.getElementById('lstm-loading').style.display  = 'block';
+    document.getElementById('lstm-error').style.display    = 'none';
+    document.getElementById('lstm-content').style.display  = 'none';
+
+    // Return from cache if available
+    if (lstmCache[variant]) {
+        lstmRender(variant, lstmCache[variant]);
+        return;
+    }
+
+    try {
+        // Fetch summary (graphs list + file listing) and data tab in parallel
+        const [summaryRes, dataRes] = await Promise.all([
+            fetch(`${SERVER}/lstm/summary`, { signal: AbortSignal.timeout(8000) }),
+            fetch(`${SERVER}/lstm/data/${variant}`, { signal: AbortSignal.timeout(8000) }),
+        ]);
+        if (!summaryRes.ok) throw new Error(`HTTP ${summaryRes.status}`);
+        const summary = await summaryRes.json();
+        const dataJson = dataRes.ok ? await dataRes.json() : { files: [] };
+
+        const vdata = summary.variants?.[variant] || {};
+        const payload = {
+            available:    vdata.available    || false,
+            label:        vdata.label        || LSTM_VARIANT_LABELS[variant] || variant,
+            graphs:       vdata.graphs       || [],
+            data_files:   (dataJson.files || []).filter(f => f.ext === 'csv'),
+            model_files:  (dataJson.files || []).filter(f => f.ext !== 'csv'),
+            data_root:    summary.data_root  || '',
+        };
+        lstmCache[variant] = payload;
+        lstmRender(variant, payload);
+    } catch(e) {
+        document.getElementById('lstm-loading').style.display = 'none';
+        const errEl = document.getElementById('lstm-error');
+        errEl.style.display = 'block';
+        errEl.innerHTML = `<b>⚠ Could not load LSTM data for variant "${variant}"</b><br><br>
+Make sure the Python server is running:<br>
+<code style="background:rgba(0,0,0,0.3);padding:2px 8px;border-radius:4px;">python server.py</code><br><br>
+Expected data at: <code>LSTM\\${variant}\\</code><br>
+Error: ${e.message}`;
+    }
+}
+
+function lstmRender(variant, data) {
+    document.getElementById('lstm-loading').style.display = 'none';
+    document.getElementById('lstm-error').style.display   = 'none';
+    document.getElementById('lstm-content').style.display = 'block';
+
+    // Status dot
+    const dot  = document.getElementById('lstm-dot');
+    const stxt = document.getElementById('lstm-status-text');
+    if (data.available) {
+        dot.className  = 'lstm-status-dot';
+        stxt.textContent = `${data.label} — ${data.graphs.length} plots · ${data.data_files.length} CSV · ${data.model_files.length} model files`;
+    } else {
+        dot.className  = 'lstm-status-dot warn';
+        stxt.textContent = `Variant "${variant}" folder not found on server`;
+    }
+
+    // Info cards
+    const grid = document.getElementById('lstm-info-grid');
+    grid.innerHTML = [
+        { k:'Variant',    v: variant },
+        { k:'Description', v: data.label },
+        { k:'Plots',       v: data.graphs.length },
+        { k:'CSV Files',   v: data.data_files.length },
+        { k:'Model Files', v: data.model_files.length },
+        { k:'Data Root',   v: data.data_root || '—' },
+    ].map(c => `
+        <div class="lstm-info-card">
+            <div class="lstm-info-k">${c.k}</div>
+            <div class="lstm-info-v">${c.v}</div>
+        </div>`).join('');
+
+    lstmRenderInner(variant);
+}
+
+function lstmRenderInner(variant) {
+    const data = lstmCache[variant];
+    if (!data) return;
+
+    const showGraphs = lstmCurrentInner === 'graphs';
+    document.getElementById('lstm-panel-graphs').style.display = showGraphs ? 'block' : 'none';
+    document.getElementById('lstm-panel-data').style.display   = showGraphs ? 'none' : 'block';
+
+    if (showGraphs) {
+        lstmRenderGraphs(variant, data);
+    } else {
+        lstmRenderData(data);
+    }
+}
+
+function lstmRenderGraphs(variant, data) {
+    const grid = document.getElementById('lstm-plots-grid');
+    const noG  = document.getElementById('lstm-no-graphs');
+    const titleEl = document.getElementById('lstm-graphs-title');
+    titleEl.childNodes[0].textContent = `${LSTM_VARIANT_LABELS[variant] || variant} — Training & Prediction Plots`;
+
+    if (!data.graphs.length) {
+        grid.innerHTML = '';
+        noG.style.display = 'block';
+        return;
+    }
+    noG.style.display = 'none';
+    grid.innerHTML = data.graphs.map(fname => {
+        const label = fname.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+        return `
+        <div class="lstm-plot-card" onclick="lstmOpenLightbox('${variant}','${fname}')">
+            <img src="${SERVER}/lstm/image/${variant}/${encodeURIComponent(fname)}"
+                 alt="${label}"
+                 loading="lazy"
+                 onerror="this.style.display='none';this.nextSibling.style.display='flex'"
+                 onload="this.style.opacity=1">
+            <div style="display:none;align-items:center;justify-content:center;padding:30px;font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(52,211,153,0.35)">Image unavailable</div>
+            <div class="lstm-plot-label">${label}</div>
+        </div>`;
+    }).join('');
+}
+
+function lstmRenderData(data) {
+    // CSV table
+    const csvTbody = document.getElementById('lstm-csv-tbody');
+    if (!data.data_files.length) {
+        csvTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:rgba(52,211,153,0.3);padding:20px;font-family:\'Share Tech Mono\',monospace;font-size:11px">No CSV files found</td></tr>';
+    } else {
+        csvTbody.innerHTML = data.data_files.map((f, idx) => `
+            <tr>
+                <td><span class="lstm-badge-csv">CSV</span> ${f.name}</td>
+                <td>${f.rows != null ? f.rows.toLocaleString() : '—'}</td>
+                <td>${f.size_kb} KB</td>
+                <td>
+                    ${f.preview ? `<button class="lstm-csv-expand" onclick="lstmToggleCsvPreview(${idx})">⊞ Preview rows</button>` : '—'}
+                </td>
+            </tr>
+            <tr id="lstm-csv-preview-${idx}" style="display:none">
+                <td colspan="4">
+                    ${f.preview ? lstmBuildCsvPreview(f.columns, f.preview) : ''}
+                </td>
+            </tr>`).join('');
+    }
+
+    // Model / Keras table
+    const mdlTbody = document.getElementById('lstm-model-tbody');
+    if (!data.model_files.length) {
+        mdlTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:rgba(52,211,153,0.3);padding:20px;font-family:\'Share Tech Mono\',monospace;font-size:11px">No model files found</td></tr>';
+    } else {
+        mdlTbody.innerHTML = data.model_files.map(f => {
+            const badgeCls = f.ext === 'keras' ? 'lstm-badge-keras' : 'lstm-badge-pkl';
+            return `<tr>
+                <td>${f.name}</td>
+                <td><span class="${badgeCls}">${f.ext.toUpperCase()}</span></td>
+                <td>${f.size_kb} KB</td>
+            </tr>`;
+        }).join('');
+    }
+}
+
+function lstmBuildCsvPreview(cols, rows) {
+    if (!cols || !rows) return '';
+    return `<div class="lstm-preview-wrap">
+        <table class="lstm-preview-table">
+            <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${r[c] ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table>
+    </div>`;
+}
+
+function lstmToggleCsvPreview(idx) {
+    const row = document.getElementById(`lstm-csv-preview-${idx}`);
+    if (!row) return;
+    const visible = row.style.display !== 'none';
+    row.style.display = visible ? 'none' : 'table-row';
+    const btn = document.querySelector(`[onclick="lstmToggleCsvPreview(${idx})"]`);
+    if (btn) btn.textContent = visible ? '⊞ Preview rows' : '⊟ Hide preview';
+}
+
+// Lightbox for graphs
+let lstmLbVariant = '', lstmLbFiles = [], lstmLbIdx = 0;
+function lstmOpenLightbox(variant, fname) {
+    lstmLbVariant = variant;
+    lstmLbFiles   = lstmCache[variant]?.graphs || [];
+    lstmLbIdx     = lstmLbFiles.indexOf(fname);
+    lstmShowLb();
+}
+function lstmShowLb() {
+    const fname = lstmLbFiles[lstmLbIdx];
+    if (!fname) return;
+
+    // Reuse the cnn-lightbox if it exists, otherwise create our own overlay
+    let lb = document.getElementById('lstm-lightbox');
+    if (!lb) {
+        lb = document.createElement('div');
+        lb.id = 'lstm-lightbox';
+        lb.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.96);backdrop-filter:blur(12px);align-items:center;justify-content:center;flex-direction:column;gap:16px;';
+        lb.innerHTML = `
+            <button onclick="lstmCloseLb()" style="position:absolute;top:24px;right:32px;font-size:28px;cursor:pointer;color:rgba(255,255,255,0.4);background:none;border:none;line-height:1;transition:color .15s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">✕</button>
+            <button onclick="lstmLbNav(-1)" style="position:absolute;left:24px;top:50%;transform:translateY(-50%);font-size:32px;cursor:pointer;color:rgba(255,255,255,0.4);background:none;border:none;line-height:1;transition:color .15s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">‹</button>
+            <img id="lstm-lb-img" style="max-width:90vw;max-height:82vh;border-radius:4px;object-fit:contain">
+            <div id="lstm-lb-cap" style="font-family:'Share Tech Mono',monospace;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:1px;text-align:center"></div>
+            <button onclick="lstmLbNav(1)"  style="position:absolute;right:24px;top:50%;transform:translateY(-50%);font-size:32px;cursor:pointer;color:rgba(255,255,255,0.4);background:none;border:none;line-height:1;transition:color .15s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">›</button>`;
+        document.body.appendChild(lb);
+    }
+    lb.style.display = 'flex';
+    document.getElementById('lstm-lb-img').src = `${SERVER}/lstm/image/${lstmLbVariant}/${encodeURIComponent(fname)}`;
+    document.getElementById('lstm-lb-cap').textContent = `${fname.replace(/\.[^.]+$/,'')} — ${lstmLbIdx+1} / ${lstmLbFiles.length}`;
+}
+function lstmCloseLb() { const lb = document.getElementById('lstm-lightbox'); if(lb) lb.style.display='none'; }
+function lstmLbNav(dir) { lstmLbIdx = (lstmLbIdx + dir + lstmLbFiles.length) % lstmLbFiles.length; lstmShowLb(); }
+
+window.openLstm  = openLstm;
+window.closeLstm = closeLstm;
+window.lstmSelectVariant  = lstmSelectVariant;
+window.lstmSelectInner    = lstmSelectInner;
+window.lstmToggleCsvPreview = lstmToggleCsvPreview;
+window.lstmOpenLightbox   = lstmOpenLightbox;
+window.lstmCloseLb        = lstmCloseLb;
+window.lstmLbNav          = lstmLbNav;
+
+</script>
+</body>
+</html>
